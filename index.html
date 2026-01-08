@@ -1,12 +1,42 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lector de Biblioteca</title>
+    <title>Q-BIT | Reader System</title>
     
+    <!-- TAILWIND CSS & CONFIG -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        qbit: {
+                            black: '#0a0a0a',
+                            dark: '#171717',     // Un poco más claro que black
+                            gray: '#262626',     // Gris oscuro para bordes
+                            white: '#ffffff',
+                            light: '#f5f5f7',    // Blanco roto para modo lectura
+                            yellow: '#FACC15',   // Acento Q-BIT
+                            yellowdim: '#ca8a04' // Acento oscuro
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Space Mono', 'monospace'],
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
     <!-- FUENTES E ICONOS -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <!-- MOTORES DE LECTURA -->
@@ -18,385 +48,352 @@
     </script>
 
     <style>
-        /* --- 1. ESTÉTICA GENERAL (MODO ZEN) --- */
-        :root {
-            --bg-app: #f5f5f7;       /* Fondo general suave */
-            --bg-reader: #ffffff;    /* Fondo del papel/libro */
-            --accent: #2563eb;       /* Color de tu escuela (Azul Pro) */
-            --text-main: #1d1d1f;    /* Texto casi negro */
-            --text-muted: #86868b;   /* Texto gris para detalles */
-            --shadow-soft: 0 10px 30px -10px rgba(0,0,0,0.1);
-            --glass: rgba(255, 255, 255, 0.85);
-        }
-
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-        body {
-            margin: 0; padding: 0;
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-app);
-            color: var(--text-main);
-            height: 100vh;
-            display: flex; flex-direction: column;
-            overflow: hidden; /* Sin scroll en el cuerpo, solo en el libro */
-        }
-
-        /* --- 2. BARRA SUPERIOR (HEADER) --- */
-        .toolbar {
-            height: 56px;
-            background: var(--glass);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 24px;
-            z-index: 100;
-            position: relative;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-        }
-
-        .brand-area { display: flex; align-items: center; gap: 12px; }
+        /* Estilos base y scrollbars personalizados */
+        body { @apply font-sans antialiased bg-qbit-light dark:bg-qbit-black text-qbit-black dark:text-qbit-white transition-colors duration-300; }
         
-        /* Simulación de Logo (Reemplazar SVG con <img src="logo.png">) */
-        .logo-placeholder {
-            width: 32px; height: 32px;
-            background: var(--accent);
-            border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: bold; font-size: 14px;
+        /* Ocultar scrollbar del body pero permitir scroll */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { @apply bg-gray-300 dark:bg-gray-700 rounded; }
+        ::-webkit-scrollbar-thumb:hover { @apply bg-qbit-yellow; }
+
+        /* Loader Animation */
+        .loader-bar {
+            width: 4px;
+            height: 24px;
+            background: #FACC15;
+            animation: loaderAnim 1s ease-in-out infinite;
+        }
+        .loader-bar:nth-child(2) { animation-delay: 0.1s; }
+        .loader-bar:nth-child(3) { animation-delay: 0.2s; }
+        @keyframes loaderAnim {
+            0%, 100% { height: 24px; opacity: 0.5; }
+            50% { height: 40px; opacity: 1; }
         }
 
-        .book-meta { display: flex; flex-direction: column; justify-content: center; }
-        .book-title { font-weight: 600; font-size: 14px; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .book-status { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
-
-        .controls-area { display: flex; align-items: center; gap: 8px; }
-
-        .btn-icon {
-            background: transparent; border: none;
-            color: #515154;
-            width: 36px; height: 36px;
-            border-radius: 8px;
-            cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            transition: all 0.2s ease;
-        }
-        .btn-icon:hover { background: rgba(0,0,0,0.05); color: black; }
-        .btn-close { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
-        .btn-close:hover { background: rgba(239, 68, 68, 0.2); color: #dc2626; }
-
-        /* --- 3. ESCENARIO PRINCIPAL --- */
-        #stage {
-            flex: 1;
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
-            background-size: 20px 20px; /* Sutil patrón de puntos */
-        }
-
-        /* Contenedores de Libros */
+        /* Estilos específicos del Canvas PDF para centrado */
         #pdf-render {
-            width: 100%; height: 100%;
-            overflow: auto;
-            display: none; /* Oculto por defecto */
-            justify-content: center;
-            padding-top: 20px;
-            padding-bottom: 40px;
-            scroll-behavior: smooth;
+            @apply flex justify-center w-full overflow-auto pt-8 pb-20 px-4;
         }
-
         canvas {
-            box-shadow: var(--shadow-soft);
-            margin-bottom: 20px;
-            max-width: 95%; /* Margen en móviles */
+            @apply shadow-xl max-w-full transition-shadow duration-300; 
+        }
+        .dark canvas {
+            box-shadow: 0 0 50px -10px rgba(0,0,0,0.5);
+            filter: brightness(0.9) contrast(1.1); /* Ajuste sutil para lectura nocturna */
         }
 
+        /* EPUB styles override */
         #epub-render {
-            width: 100%; height: 100%;
-            background: white;
-            display: none;
-            box-shadow: var(--shadow-soft);
-        }
-
-        #fallback-frame {
-            width: 100%; height: 100%; border: none; display: none; background: white;
-        }
-
-        /* --- 4. NAVEGACIÓN FLOTANTE --- */
-        .nav-arrow {
-            position: absolute; top: 50%; transform: translateY(-50%);
-            width: 48px; height: 48px;
-            background: white;
-            border-radius: 50%;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            color: #555;
-            z-index: 50;
-            opacity: 0; /* Fantasma por defecto */
-        }
-        
-        /* Aparecen al mover el mouse sobre el escenario */
-        #stage:hover .nav-arrow { opacity: 1; }
-        
-        .nav-arrow:hover { transform: translateY(-50%) scale(1.1); color: var(--accent); }
-        .nav-prev { left: 24px; }
-        .nav-next { right: 24px; }
-
-        /* --- 5. PANTALLA DE CARGA --- */
-        #loader {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: var(--bg-app);
-            z-index: 200;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-        }
-        
-        .spinner {
-            width: 40px; height: 40px;
-            border: 3px solid rgba(37, 99, 235, 0.1);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 1s infinite linear;
-            margin-bottom: 16px;
-        }
-        
-        .loading-text { font-size: 14px; color: var(--text-muted); font-weight: 500; animation: pulse 2s infinite; }
-
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-
-        /* RESPONSIVE */
-        @media (max-width: 768px) {
-            .nav-arrow { display: none; } /* En móvil se usa touch/scroll */
-            .book-title { max-width: 150px; }
+            @apply bg-white dark:bg-qbit-light w-full h-full shadow-lg;
         }
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body class="h-screen flex flex-col overflow-hidden" oncontextmenu="return false;">
 
-    <!-- PANTALLA DE CARGA -->
-    <div id="loader">
-        <div class="spinner"></div>
-        <div class="loading-text" id="status-msg">Abriendo biblioteca...</div>
+    <!-- PANTALLA DE CARGA Q-BIT -->
+    <div id="loader" class="fixed inset-0 z-[200] bg-qbit-light dark:bg-qbit-black flex flex-col justify-center items-center transition-opacity duration-500">
+        <div class="flex gap-2 items-center mb-4">
+            <div class="loader-bar"></div>
+            <div class="loader-bar"></div>
+            <div class="loader-bar"></div>
+        </div>
+        <div class="font-mono text-sm text-gray-500 dark:text-gray-400 uppercase tracking-widest animate-pulse" id="status-msg">
+            INICIALIZANDO SISTEMA...
+        </div>
     </div>
 
-    <!-- HEADER -->
-    <header class="toolbar">
-        <div class="brand-area">
-            <!-- REEMPLAZAR ESTO CON TU LOGO: <img src="logo.png" style="height:32px;"> -->
-            <div class="logo-placeholder">B</div> 
+    <!-- NAVBAR SUPERIOR -->
+    <header class="h-16 bg-white/80 dark:bg-qbit-dark/90 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 sticky top-0 z-50 shadow-sm">
+        
+        <!-- Marca y Título -->
+        <div class="flex items-center gap-4 overflow-hidden">
+            <!-- Logo Q-BIT -->
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <div class="w-8 h-8 bg-qbit-black dark:bg-qbit-white flex items-center justify-center rounded-sm">
+                    <span class="text-qbit-yellow font-bold text-lg leading-none">Q</span>
+                </div>
+                <span class="hidden md:block font-bold tracking-tighter text-lg">Q-BIT</span>
+            </div>
             
-            <div class="book-meta">
-                <span class="book-status" id="format-tag">Cargando</span>
-                <span class="book-title" id="title-display">Preparando documento...</span>
+            <!-- Separador -->
+            <div class="h-6 w-px bg-gray-300 dark:bg-gray-700 hidden sm:block"></div>
+            
+            <!-- Info del Libro -->
+            <div class="flex flex-col justify-center overflow-hidden">
+                <div class="flex items-center gap-2">
+                    <span id="format-tag" class="text-[10px] font-mono bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-500 dark:text-gray-400 uppercase tracking-wide">...</span>
+                </div>
+                <h1 id="title-display" class="text-sm font-semibold truncate max-w-[200px] sm:max-w-md">Cargando documento...</h1>
             </div>
         </div>
 
-        <div class="controls-area">
-            <button class="btn-icon" onclick="zoom(-0.1)" title="Reducir"><i data-lucide="minus"></i></button>
-            <button class="btn-icon" onclick="zoom(0.1)" title="Aumentar"><i data-lucide="plus"></i></button>
-            <div style="width: 1px; height: 24px; background: #ddd; margin: 0 4px;"></div>
-            <button class="btn-icon btn-close" onclick="closeReader()" title="Cerrar"><i data-lucide="x"></i></button>
+        <!-- Controles de Herramientas -->
+        <div class="flex items-center gap-1 sm:gap-2">
+            <!-- Zoom Controls -->
+            <div class="hidden sm:flex items-center bg-gray-100 dark:bg-qbit-black border border-gray-200 dark:border-gray-700 rounded-lg p-0.5">
+                <button onclick="zoom(-0.1)" class="w-8 h-8 flex items-center justify-center hover:bg-white dark:hover:bg-gray-800 rounded text-gray-600 dark:text-gray-300 transition-colors" title="Reducir">
+                    <i data-lucide="minus" class="w-4 h-4"></i>
+                </button>
+                <div class="w-px h-4 bg-gray-300 dark:bg-gray-700 mx-0.5"></div>
+                <button onclick="zoom(0.1)" class="w-8 h-8 flex items-center justify-center hover:bg-white dark:hover:bg-gray-800 rounded text-gray-600 dark:text-gray-300 transition-colors" title="Aumentar">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Theme Toggle -->
+            <button id="themeToggle" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                <i data-lucide="moon" class="w-5 h-5 block dark:hidden text-gray-600"></i>
+                <i data-lucide="sun" class="w-5 h-5 hidden dark:block text-qbit-yellow"></i>
+            </button>
+
+            <!-- Close Button -->
+            <button onclick="closeReader()" class="w-9 h-9 flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors ml-1 sm:ml-2">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
         </div>
     </header>
 
-    <!-- ESCENARIO -->
-    <main id="stage">
-        <!-- Botones Flotantes -->
-        <div class="nav-arrow nav-prev" onclick="changePage(-1)"><i data-lucide="chevron-left"></i></div>
-        <div class="nav-arrow nav-next" onclick="changePage(1)"><i data-lucide="chevron-right"></i></div>
+    <!-- AREA PRINCIPAL (STAGE) -->
+    <main id="stage" class="flex-1 relative flex justify-center items-start overflow-hidden bg-qbit-light dark:bg-black/50">
+        
+        <!-- Botones Flotantes de Navegación -->
+        <button onclick="changePage(-1)" class="nav-btn absolute left-4 top-1/2 -translate-y-1/2 z-40 w-12 h-12 bg-white dark:bg-qbit-dark border border-gray-200 dark:border-gray-700 shadow-xl rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-qbit-yellow dark:hover:text-qbit-yellow hover:border-qbit-yellow dark:hover:border-qbit-yellow transition-all duration-300 opacity-0 hover:opacity-100 sm:opacity-50 sm:hover:opacity-100 hover:scale-110 hidden sm:flex">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        
+        <button onclick="changePage(1)" class="nav-btn absolute right-4 top-1/2 -translate-y-1/2 z-40 w-12 h-12 bg-white dark:bg-qbit-dark border border-gray-200 dark:border-gray-700 shadow-xl rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-qbit-yellow dark:hover:text-qbit-yellow hover:border-qbit-yellow dark:hover:border-qbit-yellow transition-all duration-300 opacity-0 hover:opacity-100 sm:opacity-50 sm:hover:opacity-100 hover:scale-110 hidden sm:flex">
+            <i data-lucide="chevron-right" class="w-6 h-6"></i>
+        </button>
+
+        <!-- Controles Móviles (Bottom Bar) - Solo visible en móvil -->
+        <div class="sm:hidden absolute bottom-6 z-50 flex items-center gap-4 bg-white/90 dark:bg-qbit-dark/90 backdrop-blur px-6 py-3 rounded-full shadow-2xl border border-gray-200 dark:border-gray-700">
+            <button onclick="changePage(-1)" class="p-2"><i data-lucide="chevron-left" class="w-6 h-6 dark:text-white"></i></button>
+            <span class="text-xs font-mono dark:text-gray-400">PAGINA</span>
+            <button onclick="changePage(1)" class="p-2"><i data-lucide="chevron-right" class="w-6 h-6 dark:text-white"></i></button>
+        </div>
 
         <!-- 1. Motor PDF Pro -->
-        <div id="pdf-render"><canvas id="the-canvas"></canvas></div>
+        <div id="pdf-render" class="hidden h-full">
+            <canvas id="the-canvas"></canvas>
+        </div>
 
         <!-- 2. Motor EPUB -->
-        <div id="epub-render"></div>
+        <div id="epub-render" class="hidden"></div>
 
         <!-- 3. Motor Fallback (Google) -->
-        <iframe id="fallback-frame"></iframe>
+        <iframe id="fallback-frame" class="w-full h-full hidden border-none bg-white"></iframe>
+
     </main>
 
-<script>
-    lucide.createIcons();
-    
-    // --- VARIABLES DE ESTADO ---
-    let currentScale = 1.0;
-    let pdfDoc = null;
-    let pageNum = 1;
-    let epubRendition = null;
-    let mode = 'none';
+    <!-- LOGICA DEL SISTEMA -->
+    <script>
+        lucide.createIcons();
 
-    // --- INICIO AUTOMÁTICO AL ABRIR LA PÁGINA ---
-    window.onload = function() {
-        // Obtenemos los datos desde la URL (enviados por Wix)
-        const params = new URLSearchParams(window.location.search);
-        
-        // Buscamos parámetros 'file' o 'libro' y 'title' o 'titulo'
-        const rawUrl = params.get('file') || params.get('libro');
-        const title = params.get('title') || params.get('titulo');
+        // --- GESTION DE TEMA ---
+        const themeToggleBtn = document.getElementById('themeToggle');
+        const htmlElement = document.documentElement;
 
-        if (title) document.getElementById('title-display').innerText = title;
-
-        if (rawUrl) {
-            initReader(rawUrl);
+        // Cargar preferencia
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            htmlElement.classList.add('dark');
         } else {
-            showError("No se especificó ningún libro.");
+            htmlElement.classList.remove('dark');
         }
-    };
 
-    // --- 1. PREPARACIÓN Y LIMPIEZA (VERSIÓN CORREGIDA) ---
-    function initReader(rawUrl) {
-        // Corrección de enlaces Wix
-        let url = rawUrl;
-        
-        // El enlace llega así: wix:document://v1/ugd/ID_DEL_ARCHIVO/Nombre.pdf
-        if (url.includes("wix:document://")) {
-            const parts = url.split("/");
-            // parts[4] es donde está el ID real del archivo (ej: 950741_...)
-            if(parts.length >= 5) {
-                url = `https://docs.wixstatic.com/ugd/${parts[4]}`;
+        themeToggleBtn.addEventListener('click', () => {
+            htmlElement.classList.toggle('dark');
+            if (htmlElement.classList.contains('dark')) {
+                localStorage.setItem('theme', 'dark');
+            } else {
+                localStorage.setItem('theme', 'light');
             }
-        }
-        
-        console.log("URL Final procesada:", url); // Para depurar
-
-        // Determinar formato
-        let ext = 'pdf';
-        try { ext = url.split('?')[0].split('.').pop().toLowerCase(); } catch(e){}
-        
-        if(ext === 'epub') {
-            loadEpub(url);
-        } else {
-            loadPdfPro(url);
-        }
-    }
-
-    // --- 2. MOTOR PDF PRO (Alta Calidad) ---
-    async function loadPdfPro(url) {
-        setMode('pdf');
-        updateStatus("PDF PRO", "Cargando alta definición...");
-        
-        try {
-            const loadingTask = pdfjsLib.getDocument(url);
-            pdfDoc = await loadingTask.promise;
-            
-            // Si carga, ocultamos loader y mostramos PDF
-            document.getElementById('loader').style.display = 'none';
-            document.getElementById('pdf-render').style.display = 'flex';
-            
-            renderPdfPage(1);
-        } catch (error) {
-            console.warn("Bloqueo de seguridad detectado. Cambiando a Modo Compatible.");
-            loadFallback(url);
-        }
-    }
-
-    function renderPdfPage(num) {
-        pdfDoc.getPage(num).then(page => {
-            const canvas = document.getElementById('the-canvas');
-            const ctx = canvas.getContext('2d');
-            const viewport = page.getViewport({scale: currentScale});
-            
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            
-            // Renderizado
-            page.render({canvasContext: ctx, viewport: viewport});
         });
-    }
 
-    // --- 3. MOTOR EPUB (Libro Digital) ---
-    function loadEpub(url) {
-        setMode('epub');
-        updateStatus("EBOOK", "Formateando texto...");
-        
-        try {
-            const book = ePub(url);
-            epubRendition = book.renderTo("epub-render", { width: "100%", height: "100%", flow: "paginated" });
-            
-            document.getElementById('loader').style.display = 'none';
-            document.getElementById('epub-render').style.display = 'block';
-            
-            epubRendition.display().then(() => {
-                // Aplicar estilo limpio al libro
-                epubRendition.themes.register("clean", { 
-                    body: { "font-family": "Inter, Helvetica, sans-serif", "font-size": "18px", "color": "#333" } 
-                });
-                epubRendition.themes.select("clean");
-            });
+        // --- VARIABLES DE ESTADO ---
+        let currentScale = 1.0;
+        let pdfDoc = null;
+        let pageNum = 1;
+        let epubRendition = null;
+        let mode = 'none';
 
-        } catch (e) {
-            loadFallback(url);
-        }
-    }
+        // --- INICIO AUTOMÁTICO ---
+        window.onload = function() {
+            const params = new URLSearchParams(window.location.search);
+            const rawUrl = params.get('file') || params.get('libro');
+            const title = params.get('title') || params.get('titulo');
 
-    // --- 4. MOTOR COMPATIBLE (Google Fallback) ---
-    function loadFallback(url) {
-        setMode('google');
-        updateStatus("VISTA COMPATIBLE", "Abriendo vía Google...");
-        
-        const iframe = document.getElementById('fallback-frame');
-        iframe.style.display = 'block';
-        iframe.src = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-        
-        document.getElementById('loader').style.display = 'none';
-        
-        // Ocultar flechas porque Google tiene las suyas
-        document.querySelectorAll('.nav-arrow').forEach(el => el.style.display = 'none');
-    }
+            if (title) document.getElementById('title-display').innerText = title;
 
-    // --- UTILIDADES ---
-    function setMode(newMode) {
-        mode = newMode;
-        // Ocultar todos
-        document.getElementById('pdf-render').style.display = 'none';
-        document.getElementById('epub-render').style.display = 'none';
-        document.getElementById('fallback-frame').style.display = 'none';
-    }
-
-    function updateStatus(badge, msg) {
-        document.getElementById('format-tag').innerText = badge;
-        if(msg) document.getElementById('status-msg').innerText = msg;
-    }
-
-    function changePage(dir) {
-        if(mode === 'pdf' && pdfDoc) {
-            if(pageNum + dir >= 1 && pageNum + dir <= pdfDoc.numPages) {
-                pageNum += dir;
-                renderPdfPage(pageNum);
-                // Scroll arriba al cambiar página
-                document.getElementById('pdf-render').scrollTop = 0;
+            if (rawUrl) {
+                initReader(rawUrl);
+            } else {
+                showError("Esperando archivo...");
+                // DEMO MODE: Si no hay archivo, carga un PDF de ejemplo para visualización (puedes quitar esto en prod)
+                // loadPdfPro('https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/examples/learning/helloworld.pdf');
             }
-        } else if (mode === 'epub' && epubRendition) {
-            dir > 0 ? epubRendition.next() : epubRendition.prev();
+        };
+
+        function initReader(rawUrl) {
+            let url = rawUrl;
+            
+            // Lógica WIX
+            if (url.includes("wix:document://")) {
+                const parts = url.split("/");
+                if(parts.length >= 5) {
+                    url = `https://docs.wixstatic.com/ugd/${parts[4]}`;
+                }
+            }
+            console.log("Q-BIT System: Loading URL ->", url);
+
+            let ext = 'pdf';
+            try { ext = url.split('?')[0].split('.').pop().toLowerCase(); } catch(e){}
+            
+            if(ext === 'epub') {
+                loadEpub(url);
+            } else {
+                loadPdfPro(url);
+            }
         }
-    }
 
-    function zoom(delta) {
-        if(mode === 'pdf') {
-            currentScale += delta;
-            renderPdfPage(pageNum);
-        } else if (mode === 'epub') {
-            const size = 100 + (delta * 20);
-            epubRendition.themes.fontSize(size + "%");
+        // --- MOTOR PDF ---
+        async function loadPdfPro(url) {
+            setMode('pdf');
+            updateStatus("PDF DOC", "RENDERIZANDO VECTORIAL...");
+            
+            try {
+                const loadingTask = pdfjsLib.getDocument(url);
+                pdfDoc = await loadingTask.promise;
+                
+                document.getElementById('loader').classList.add('opacity-0', 'pointer-events-none');
+                document.getElementById('pdf-render').classList.remove('hidden');
+                document.getElementById('pdf-render').classList.add('flex');
+                
+                renderPdfPage(1);
+            } catch (error) {
+                console.warn("Q-BIT Security: Fallback triggered.");
+                loadFallback(url);
+            }
         }
-    }
 
-    function closeReader() {
-        // Intenta cerrar la pestaña. Si el navegador lo bloquea, redirige a google (o a tu web)
-        window.close();
-        window.history.back();
-    }
+        function renderPdfPage(num) {
+            pdfDoc.getPage(num).then(page => {
+                const canvas = document.getElementById('the-canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Ajustamos escala para mejor calidad en pantallas retina
+                const outputScale = window.devicePixelRatio || 1;
+                const viewport = page.getViewport({scale: currentScale});
+                
+                canvas.width = Math.floor(viewport.width * outputScale);
+                canvas.height = Math.floor(viewport.height * outputScale);
+                canvas.style.width = Math.floor(viewport.width) + "px";
+                canvas.style.height = Math.floor(viewport.height) + "px";
+                
+                const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
 
-    function showError(msg) {
-        document.getElementById('status-msg').innerText = msg;
-        document.getElementById('status-msg').style.color = "red";
-    }
+                const renderContext = {
+                    canvasContext: ctx,
+                    transform: transform,
+                    viewport: viewport
+                };
+                
+                page.render(renderContext);
+            });
+        }
 
-</script>
+        // --- MOTOR EPUB ---
+        function loadEpub(url) {
+            setMode('epub');
+            updateStatus("EBOOK", "FORMATO FLUIDO...");
+            
+            try {
+                const book = ePub(url);
+                epubRendition = book.renderTo("epub-render", { width: "100%", height: "100%", flow: "paginated" });
+                
+                document.getElementById('loader').classList.add('opacity-0', 'pointer-events-none');
+                document.getElementById('epub-render').classList.remove('hidden');
+                
+                epubRendition.display().then(() => {
+                    // Estilos Q-BIT para el contenido del EPUB
+                    epubRendition.themes.register("qbit", { 
+                        body: { 
+                            "font-family": "Inter, sans-serif", 
+                            "font-size": "18px", 
+                            "color": "#111",
+                            "padding": "0 20px"
+                        } 
+                    });
+                    epubRendition.themes.select("qbit");
+                });
+
+            } catch (e) {
+                loadFallback(url);
+            }
+        }
+
+        // --- FALLBACK ---
+        function loadFallback(url) {
+            setMode('google');
+            updateStatus("VIEWER", "MODO COMPATIBILIDAD...");
+            
+            const iframe = document.getElementById('fallback-frame');
+            iframe.classList.remove('hidden');
+            iframe.src = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+            
+            document.getElementById('loader').classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        // --- UTILS ---
+        function setMode(newMode) {
+            mode = newMode;
+            document.getElementById('pdf-render').classList.add('hidden');
+            document.getElementById('pdf-render').classList.remove('flex');
+            document.getElementById('epub-render').classList.add('hidden');
+            document.getElementById('fallback-frame').classList.add('hidden');
+        }
+
+        function updateStatus(badge, msg) {
+            document.getElementById('format-tag').innerText = badge;
+            if(msg) document.getElementById('status-msg').innerText = msg;
+        }
+
+        function changePage(dir) {
+            if(mode === 'pdf' && pdfDoc) {
+                if(pageNum + dir >= 1 && pageNum + dir <= pdfDoc.numPages) {
+                    pageNum += dir;
+                    renderPdfPage(pageNum);
+                    document.getElementById('pdf-render').scrollTop = 0;
+                }
+            } else if (mode === 'epub' && epubRendition) {
+                dir > 0 ? epubRendition.next() : epubRendition.prev();
+            }
+        }
+
+        function zoom(delta) {
+            if(mode === 'pdf') {
+                const newScale = currentScale + delta;
+                if(newScale > 0.2 && newScale < 4.0) {
+                    currentScale = newScale;
+                    renderPdfPage(pageNum);
+                }
+            } else if (mode === 'epub' && epubRendition) {
+                // Lógica de zoom para EPUB (simple)
+                epubRendition.themes.fontSize("120%"); // Ejemplo simplificado
+            }
+        }
+
+        function closeReader() {
+            try {
+                window.close();
+            } catch(e) {}
+            window.history.back();
+        }
+
+        function showError(msg) {
+            document.getElementById('status-msg').innerText = msg;
+            document.getElementById('status-msg').classList.add('text-red-500');
+        }
+    </script>
 </body>
 </html>
