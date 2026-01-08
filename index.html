@@ -248,17 +248,23 @@
         }
     };
 
-    // --- 1. PREPARACIÓN Y LIMPIEZA ---
+    // --- 1. PREPARACIÓN Y LIMPIEZA (VERSIÓN CORREGIDA) ---
     function initReader(rawUrl) {
-        // Corrección de enlaces Wix (wix:document:// -> https://)
+        // Corrección de enlaces Wix
         let url = rawUrl;
+        
+        // El enlace llega así: wix:document://v1/ugd/ID_DEL_ARCHIVO/Nombre.pdf
         if (url.includes("wix:document://")) {
             const parts = url.split("/");
-            if(parts.length > 3) url = `https://docs.wixstatic.com/ugd/${parts[3]}`;
+            // parts[4] es donde está el ID real del archivo (ej: 950741_...)
+            if(parts.length >= 5) {
+                url = `https://docs.wixstatic.com/ugd/${parts[4]}`;
+            }
         }
         
+        console.log("URL Final procesada:", url); // Para depurar
+
         // Determinar formato
-        // Si no tiene extensión visible, asumimos PDF por defecto
         let ext = 'pdf';
         try { ext = url.split('?')[0].split('.').pop().toLowerCase(); } catch(e){}
         
