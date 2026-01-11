@@ -41,10 +41,12 @@
     </script>
 
     <style>
-        /* Ajuste 100dvh para móviles */
+        /* Layout flex vertical completo que ocupa el 100% de la altura visible real */
         body { 
             @apply font-sans antialiased bg-qbit-light dark:bg-zinc-900 text-qbit-black dark:text-qbit-white transition-colors duration-300;
             height: 100dvh; 
+            display: flex;
+            flex-direction: column;
         }
         
         /* Loader Animation */
@@ -63,8 +65,8 @@
 
         /* Estilos PDF Canvas */
         #pdf-render {
-            /* padding-bottom amplio para que el texto final suba por encima de la barra */
-            @apply flex justify-center w-full overflow-auto pt-4 pb-32 sm:pt-8 sm:pb-20 px-2 sm:px-16 transition-all duration-300;
+            /* Eliminamos paddings excesivos porque ahora el layout es seguro */
+            @apply flex justify-center w-full h-full overflow-auto p-4 sm:px-16 transition-all duration-300;
             -webkit-overflow-scrolling: touch; 
         }
         canvas {
@@ -91,7 +93,7 @@
         }
     </style>
 </head>
-<body class="flex flex-col overflow-hidden" oncontextmenu="return false;">
+<body oncontextmenu="return false;">
 
     <div id="loader" class="fixed inset-0 z-[999] bg-qbit-light dark:bg-black flex flex-col justify-center items-center">
         <div class="flex gap-2 items-center mb-4">
@@ -106,7 +108,7 @@
 
     <div id="reading-ruler" class="hidden fixed left-0 right-0 h-8 bg-qbit-yellow/30 border-y border-qbit-yellow/60 z-30 mix-blend-multiply dark:mix-blend-difference"></div>
 
-    <header class="h-16 bg-black text-white border-b border-gray-800 flex items-center justify-between px-4 sticky top-0 z-50 shadow-lg shrink-0">
+    <header class="h-16 shrink-0 bg-black text-white border-b border-gray-800 flex items-center justify-between px-4 z-50 shadow-lg relative">
         <div class="flex items-center gap-4">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 bg-qbit-yellow flex items-center justify-center rounded-sm text-black">
@@ -145,7 +147,7 @@
         </div>
     </header>
 
-    <main id="stage" class="flex-1 relative flex justify-center items-start overflow-hidden bg-qbit-light dark:bg-[#121212]">
+    <main id="stage" class="flex-1 relative flex justify-center items-start overflow-hidden bg-qbit-light dark:bg-[#121212] w-full">
         
         <button onclick="changePage(-1)" class="absolute left-4 top-1/2 -translate-y-1/2 z-40 w-12 h-12 rounded-full hidden sm:flex items-center justify-center text-gray-400 hover:text-black hover:bg-white hover:shadow-xl dark:hover:text-qbit-yellow dark:hover:bg-gray-900 transition-all duration-300 opacity-50 hover:opacity-100 group">
             <i data-lucide="chevron-left" class="w-8 h-8 group-hover:scale-110 transition"></i>
@@ -154,13 +156,7 @@
             <i data-lucide="chevron-right" class="w-8 h-8 group-hover:scale-110 transition"></i>
         </button>
 
-        <div class="sm:hidden absolute bottom-6 z-50 flex items-center gap-6 bg-black/30 dark:bg-black/40 backdrop-blur-md px-5 py-2 rounded-full border border-white/10 text-white shadow-lg">
-            <button onclick="changePage(-1)" class="p-1 active:scale-90 transition hover:text-qbit-yellow"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
-            <span class="text-[10px] font-mono font-bold text-qbit-yellow tracking-widest opacity-80">NAV</span>
-            <button onclick="changePage(1)" class="p-1 active:scale-90 transition hover:text-qbit-yellow"><i data-lucide="chevron-right" class="w-6 h-6"></i></button>
-        </div>
-
-        <div id="pdf-render" class="hidden h-full"><canvas id="the-canvas"></canvas></div>
+        <div id="pdf-render" class="hidden"><canvas id="the-canvas"></canvas></div>
         <div id="epub-render" class="hidden h-full w-full bg-white dark:bg-[#121212]"></div>
         <iframe id="fallback-frame" class="w-full h-full hidden border-none bg-white"></iframe>
         
@@ -173,6 +169,20 @@
 
     </main>
 
+    <footer class="sm:hidden shrink-0 h-14 bg-black border-t border-gray-800 flex items-center justify-between px-6 z-50">
+        <button onclick="changePage(-1)" class="flex items-center gap-2 text-gray-400 hover:text-white active:scale-95 transition">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+            <span class="text-xs font-bold">ANT</span>
+        </button>
+        
+        <div class="h-4 w-px bg-gray-800"></div>
+        
+        <button onclick="changePage(1)" class="flex items-center gap-2 text-qbit-yellow hover:text-yellow-300 active:scale-95 transition">
+            <span class="text-xs font-bold">SIG</span>
+            <i data-lucide="chevron-right" class="w-6 h-6"></i>
+        </button>
+    </footer>
+
     <script>
         lucide.createIcons();
 
@@ -180,7 +190,6 @@
         const themeToggleBtn = document.getElementById('themeToggle');
         const htmlElement = document.documentElement;
         
-        // Lógica Marcador / Regla
         let rulerActive = false;
         const rulerEl = document.getElementById('reading-ruler');
         const stageEl = document.getElementById('stage');
@@ -201,7 +210,9 @@
 
         stageEl.addEventListener('click', (e) => {
             if(rulerActive) {
-                rulerEl.style.top = (e.clientY - 16) + 'px'; 
+                // Ajustamos posición (Header es 64px)
+                // e.clientY da la posición en ventana, restamos el header para colocarlo bien relativo o absoluto
+                rulerEl.style.top = (e.clientY) + 'px'; 
             }
         });
 
