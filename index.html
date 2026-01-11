@@ -41,7 +41,7 @@
     </script>
 
     <style>
-        /* CORRECCIÓN MÓVIL: Usamos 100dvh en lugar de h-screen para evitar que las barras del navegador tapen contenido */
+        /* Ajuste 100dvh para móviles */
         body { 
             @apply font-sans antialiased bg-qbit-light dark:bg-zinc-900 text-qbit-black dark:text-qbit-white transition-colors duration-300;
             height: 100dvh; 
@@ -63,9 +63,9 @@
 
         /* Estilos PDF Canvas */
         #pdf-render {
-            /* padding-bottom aumentado (pb-32) para asegurar que el scroll llegue hasta el final en móviles */
+            /* padding-bottom amplio para que el texto final suba por encima de la barra */
             @apply flex justify-center w-full overflow-auto pt-4 pb-32 sm:pt-8 sm:pb-20 px-2 sm:px-16 transition-all duration-300;
-            -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+            -webkit-overflow-scrolling: touch; 
         }
         canvas {
             @apply shadow-2xl max-w-full transition-all duration-300 bg-white; 
@@ -154,10 +154,10 @@
             <i data-lucide="chevron-right" class="w-8 h-8 group-hover:scale-110 transition"></i>
         </button>
 
-        <div class="sm:hidden absolute bottom-6 z-50 flex items-center gap-6 bg-black/90 backdrop-blur px-6 py-3 rounded-full shadow-2xl border border-gray-800 text-white">
-            <button onclick="changePage(-1)" class="p-1 active:scale-90 transition"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
-            <span class="text-xs font-mono font-bold text-qbit-yellow">NAV</span>
-            <button onclick="changePage(1)" class="p-1 active:scale-90 transition"><i data-lucide="chevron-right" class="w-6 h-6"></i></button>
+        <div class="sm:hidden absolute bottom-6 z-50 flex items-center gap-6 bg-black/30 dark:bg-black/40 backdrop-blur-md px-5 py-2 rounded-full border border-white/10 text-white shadow-lg">
+            <button onclick="changePage(-1)" class="p-1 active:scale-90 transition hover:text-qbit-yellow"><i data-lucide="chevron-left" class="w-6 h-6"></i></button>
+            <span class="text-[10px] font-mono font-bold text-qbit-yellow tracking-widest opacity-80">NAV</span>
+            <button onclick="changePage(1)" class="p-1 active:scale-90 transition hover:text-qbit-yellow"><i data-lucide="chevron-right" class="w-6 h-6"></i></button>
         </div>
 
         <div id="pdf-render" class="hidden h-full"><canvas id="the-canvas"></canvas></div>
@@ -270,7 +270,7 @@
             else loadPdfPro(url);
         }
 
-        // 2. MOTOR PDF CON AJUSTE AUTOMÁTICO PARA MÓVIL
+        // MOTOR PDF
         async function loadPdfPro(url) {
             setMode('pdf');
             document.getElementById('status-msg').innerText = "PROCESANDO PDF...";
@@ -283,10 +283,8 @@
                 document.getElementById('pdf-render').classList.remove('hidden');
                 document.getElementById('pdf-render').classList.add('flex');
                 
-                // AJUSTE AUTOMÁTICO DE ZOOM PARA MÓVILES
+                // AJUSTE ZOOM MÓVIL
                 if (window.innerWidth < 640) {
-                    // Si es celular, calculamos un zoom aproximado basado en el ancho
-                    // 0.5 o 0.6 suele ir bien para que no se salga de la pantalla vertical
                     currentScale = 0.6; 
                 } else {
                     currentScale = 1.0;
@@ -305,9 +303,6 @@
                 const ctx = canvas.getContext('2d');
                 const outputScale = window.devicePixelRatio || 1;
                 
-                // Ajuste inteligente: si el canvas va a ser más ancho que la pantalla, reducimos escala
-                // (Solo si no hemos hecho zoom manual explícito, pero por simplicidad mantenemos currentScale)
-                
                 const viewport = page.getViewport({scale: currentScale});
                 
                 canvas.width = Math.floor(viewport.width * outputScale);
@@ -325,7 +320,7 @@
             });
         }
 
-        // 3. MOTOR EPUB
+        // MOTOR EPUB
         function loadEpub(url) {
             setMode('epub');
             document.getElementById('status-msg').innerText = "ABRIENDO EBOOK...";
@@ -355,7 +350,7 @@
             }
         }
 
-        // 4. FALLBACK GOOGLE
+        // FALLBACK
         function loadFallback(url) {
             setMode('google');
             hideLoader();
