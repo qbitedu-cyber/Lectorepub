@@ -13,12 +13,12 @@
                 extend: {
                     colors: {
                         qbit: {
-                            black: '#000000',     /* Negro puro marca */
-                            dark: '#171717',      /* Negro suave UI */
+                            black: '#000000',
+                            dark: '#171717',
                             gray: '#262626',
                             white: '#ffffff',
                             light: '#f5f5f7',
-                            yellow: '#FACC15',    /* Amarillo Accent */
+                            yellow: '#FACC15',
                         }
                     },
                     fontFamily: {
@@ -41,7 +41,11 @@
     </script>
 
     <style>
-        body { @apply font-sans antialiased bg-qbit-light dark:bg-zinc-900 text-qbit-black dark:text-qbit-white transition-colors duration-300; }
+        /* CORRECCIÓN MÓVIL: Usamos 100dvh en lugar de h-screen para evitar que las barras del navegador tapen contenido */
+        body { 
+            @apply font-sans antialiased bg-qbit-light dark:bg-zinc-900 text-qbit-black dark:text-qbit-white transition-colors duration-300;
+            height: 100dvh; 
+        }
         
         /* Loader Animation */
         .loader-bar {
@@ -59,21 +63,18 @@
 
         /* Estilos PDF Canvas */
         #pdf-render {
-            /* padding-x aumentado en desktop para que las flechas no toquen el libro */
-            @apply flex justify-center w-full overflow-auto pt-8 pb-20 px-2 sm:px-16 transition-all duration-300;
-            -webkit-overflow-scrolling: touch;
+            /* padding-bottom aumentado (pb-32) para asegurar que el scroll llegue hasta el final en móviles */
+            @apply flex justify-center w-full overflow-auto pt-4 pb-32 sm:pt-8 sm:pb-20 px-2 sm:px-16 transition-all duration-300;
+            -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
         }
         canvas {
             @apply shadow-2xl max-w-full transition-all duration-300 bg-white; 
         }
         
-        /* MODO OSCURO MEJORADO PARA PDF */
         .dark canvas {
-            /* Invierte colores (papel negro, letras blancas) y ajusta tono para no cansar la vista */
             filter: invert(1) hue-rotate(180deg) contrast(0.8);
         }
         
-        /* El loader */
         #loader {
             transition: opacity 0.5s ease-out, visibility 0.5s;
         }
@@ -83,15 +84,14 @@
             pointer-events: none;
         }
 
-        /* Estilos de la Regla/Marcador */
         #reading-ruler {
-            pointer-events: none; /* Permite clicks a través de ella */
+            pointer-events: none;
             transition: top 0.1s ease-out;
             box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
         }
     </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden" oncontextmenu="return false;">
+<body class="flex flex-col overflow-hidden" oncontextmenu="return false;">
 
     <div id="loader" class="fixed inset-0 z-[999] bg-qbit-light dark:bg-black flex flex-col justify-center items-center">
         <div class="flex gap-2 items-center mb-4">
@@ -106,7 +106,7 @@
 
     <div id="reading-ruler" class="hidden fixed left-0 right-0 h-8 bg-qbit-yellow/30 border-y border-qbit-yellow/60 z-30 mix-blend-multiply dark:mix-blend-difference"></div>
 
-    <header class="h-16 bg-black text-white border-b border-gray-800 flex items-center justify-between px-4 sticky top-0 z-50 shadow-lg">
+    <header class="h-16 bg-black text-white border-b border-gray-800 flex items-center justify-between px-4 sticky top-0 z-50 shadow-lg shrink-0">
         <div class="flex items-center gap-4">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 bg-qbit-yellow flex items-center justify-center rounded-sm text-black">
@@ -124,8 +124,7 @@
         </div>
 
         <div class="flex items-center gap-3">
-            
-            <button onclick="toggleRuler()" id="btn-ruler" title="Activar Marcador de Renglón" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-800 text-gray-400 hover:text-qbit-yellow transition">
+            <button onclick="toggleRuler()" id="btn-ruler" title="Activar Marcador" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-800 text-gray-400 hover:text-qbit-yellow transition">
                 <i data-lucide="ruler" class="w-5 h-5"></i>
             </button>
 
@@ -189,7 +188,6 @@
         function toggleRuler() {
             rulerActive = !rulerActive;
             const btn = document.getElementById('btn-ruler');
-            
             if(rulerActive) {
                 rulerEl.classList.remove('hidden');
                 btn.classList.add('text-qbit-yellow', 'bg-gray-800');
@@ -201,15 +199,12 @@
             }
         }
 
-        // Mover el marcador al hacer click
         stageEl.addEventListener('click', (e) => {
             if(rulerActive) {
-                // Ajustamos la posición restando la altura del header
                 rulerEl.style.top = (e.clientY - 16) + 'px'; 
             }
         });
 
-        // Lógica Tema Oscuro
         function applyThemeToEpub() {
             if (!epubRendition) return;
             const isDark = htmlElement.classList.contains('dark');
@@ -228,18 +223,17 @@
             htmlElement.classList.toggle('dark');
             const isDark = htmlElement.classList.contains('dark');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            applyThemeToEpub(); // Actualizar EPUB si está abierto
+            applyThemeToEpub(); 
         });
 
-        // --- LÓGICA PRINCIPAL (FUNCIONALIDAD INTACTA) ---
+        // --- LÓGICA PRINCIPAL ---
         let currentScale = 1.0;
         let pdfDoc = null;
         let pageNum = 1;
         let epubRendition = null;
         let mode = 'none';
-        let currentEpubSize = 100; // Variable para controlar zoom epub
+        let currentEpubSize = 100;
 
-        // 1. INICIALIZACIÓN SEGURA
         window.onload = function() {
             setTimeout(hideLoader, 4000);
 
@@ -276,7 +270,7 @@
             else loadPdfPro(url);
         }
 
-        // 2. MOTOR PDF
+        // 2. MOTOR PDF CON AJUSTE AUTOMÁTICO PARA MÓVIL
         async function loadPdfPro(url) {
             setMode('pdf');
             document.getElementById('status-msg').innerText = "PROCESANDO PDF...";
@@ -288,6 +282,15 @@
                 
                 document.getElementById('pdf-render').classList.remove('hidden');
                 document.getElementById('pdf-render').classList.add('flex');
+                
+                // AJUSTE AUTOMÁTICO DE ZOOM PARA MÓVILES
+                if (window.innerWidth < 640) {
+                    // Si es celular, calculamos un zoom aproximado basado en el ancho
+                    // 0.5 o 0.6 suele ir bien para que no se salga de la pantalla vertical
+                    currentScale = 0.6; 
+                } else {
+                    currentScale = 1.0;
+                }
                 
                 renderPdfPage(1);
             } catch (error) {
@@ -301,6 +304,10 @@
                 const canvas = document.getElementById('the-canvas');
                 const ctx = canvas.getContext('2d');
                 const outputScale = window.devicePixelRatio || 1;
+                
+                // Ajuste inteligente: si el canvas va a ser más ancho que la pantalla, reducimos escala
+                // (Solo si no hemos hecho zoom manual explícito, pero por simplicidad mantenemos currentScale)
+                
                 const viewport = page.getViewport({scale: currentScale});
                 
                 canvas.width = Math.floor(viewport.width * outputScale);
@@ -331,19 +338,17 @@
                 document.getElementById('epub-render').classList.remove('hidden');
                 
                 epubRendition.display().then(() => {
-                    // Tema Claro (Q-BIT)
                     epubRendition.themes.register("qbit", { 
                         body: { "font-family": "Inter, sans-serif", "color": "#111", "padding": "0 20px" },
                         p: { "font-size": "18px", "line-height": "1.6" }
                     });
                     
-                    // Tema Oscuro
                     epubRendition.themes.register("dark", { 
                         body: { "font-family": "Inter, sans-serif", "color": "#e5e5e5", "background-color": "#121212 !important", "padding": "0 20px" },
                         p: { "font-size": "18px", "line-height": "1.6" }
                     });
                     
-                    applyThemeToEpub(); // Aplicar tema actual
+                    applyThemeToEpub(); 
                 });
             } catch (e) {
                 loadFallback(url);
@@ -389,8 +394,7 @@
                     renderPdfPage(pageNum);
                 }
             } else if (mode === 'epub' && epubRendition) {
-                // Lógica de Zoom corregida para EPUB
-                currentEpubSize += (delta * 100); // delta es 0.1, queremos mover de 10 en 10 aprox
+                currentEpubSize += (delta * 100); 
                 if(currentEpubSize < 50) currentEpubSize = 50;
                 if(currentEpubSize > 300) currentEpubSize = 300;
                 epubRendition.themes.fontSize(currentEpubSize + "%");
