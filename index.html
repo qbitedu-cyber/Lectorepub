@@ -41,6 +41,7 @@
     </script>
 
     <style>
+        /* Layout Estructural: Header + Main + Footer = 100% Alto Real */
         body { 
             @apply font-sans antialiased bg-qbit-light dark:bg-zinc-900 text-qbit-black dark:text-qbit-white transition-colors duration-300;
             height: 100dvh; 
@@ -48,6 +49,7 @@
             flex-direction: column;
         }
         
+        /* Loader Animation */
         .loader-bar {
             width: 4px;
             height: 24px;
@@ -61,12 +63,20 @@
             50% { height: 40px; opacity: 1; }
         }
 
+        /* CORRECCIÓN CRÍTICA DE PDF:
+           1. overflow-auto: Permite scroll en todas direcciones si el zoom es grande.
+           2. items-start: Evita que el centrado flex impida hacer scroll al inicio.
+        */
         #pdf-render {
-            @apply flex justify-center w-full h-full overflow-auto p-4 sm:px-16 transition-all duration-300;
+            @apply flex justify-center items-start w-full h-full overflow-auto p-4 sm:px-16 transition-all duration-300;
             -webkit-overflow-scrolling: touch; 
         }
+
+        /* IMPORTANTE: max-w-none permite que el canvas crezca más que la pantalla al hacer zoom.
+           Esto habilita el scroll horizontal/vertical necesario para leer.
+        */
         canvas {
-            @apply shadow-2xl max-w-full transition-all duration-300 bg-white; 
+            @apply shadow-2xl max-w-none transition-all duration-300 bg-white; 
         }
         
         .dark canvas {
@@ -88,7 +98,6 @@
             box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
         }
         
-        /* Estilo para el input de número de página */
         .page-input::-webkit-inner-spin-button, 
         .page-input::-webkit-outer-spin-button { 
             -webkit-appearance: none; 
@@ -174,10 +183,31 @@
 
     </main>
 
+    <footer class="sm:hidden shrink-0 h-14 bg-black border-t border-gray-800 flex items-center justify-between px-4 z-50">
+        
+        <button onclick="changePage(-1)" class="flex flex-col items-center justify-center w-12 h-full text-gray-400 hover:text-white active:scale-95 transition">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        
+        <div class="flex items-center bg-gray-900 border border-gray-800 rounded-lg px-2 py-1">
+            <button onclick="zoom(-0.1)" class="p-1 text-gray-400 hover:text-white active:scale-90 transition">
+                <i data-lucide="minus" class="w-5 h-5"></i>
+            </button>
+            <div class="w-px h-4 bg-gray-700 mx-2"></div>
+            <button onclick="zoom(0.1)" class="p-1 text-gray-400 hover:text-white active:scale-90 transition">
+                <i data-lucide="plus" class="w-5 h-5"></i>
+            </button>
+        </div>
+        
+        <button onclick="changePage(1)" class="flex flex-col items-center justify-center w-12 h-full text-qbit-yellow hover:text-yellow-300 active:scale-95 transition">
+            <i data-lucide="chevron-right" class="w-6 h-6"></i>
+        </button>
+    </footer>
+
     <script>
         lucide.createIcons();
 
-        // --- GESTIÓN DE UI ---
+        // --- UI & TEMA ---
         const themeToggleBtn = document.getElementById('themeToggle');
         const htmlElement = document.documentElement;
         const pageInput = document.getElementById('page-input');
@@ -186,8 +216,6 @@
         let rulerActive = false;
         const rulerEl = document.getElementById('reading-ruler');
         const stageEl = document.getElementById('stage');
-        
-        // Identificador único del libro para guardar progreso
         let bookId = 'doc_generico';
 
         function toggleRuler() {
@@ -208,7 +236,6 @@
             if(rulerActive) rulerEl.style.top = (e.clientY) + 'px'; 
         });
 
-        // INPUT DE PÁGINA (EVENTO ENTER)
         pageInput.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 let target = parseFloat(pageInput.value);
@@ -216,10 +243,9 @@
                     if(target >= 1 && target <= pdfDoc.numPages) {
                         pageNum = Math.floor(target);
                         renderPdfPage(pageNum);
-                        pageInput.blur(); // Quitar foco para esconder teclado móvil
+                        pageInput.blur(); 
                     }
                 } else if (mode === 'epub' && epubRendition) {
-                    // Para Epub usamos porcentaje (0-100)
                     if(target >= 0 && target <= 100) {
                         let cfi = epubRendition.book.locations.cfiFromPercentage(target / 100);
                         epubRendition.display(cfi);
@@ -232,13 +258,10 @@
         function updatePageDisplay() {
             if(mode === 'pdf') {
                 pageInput.value = pageNum;
-                // Guardar Progreso en Memoria del Teléfono/PC
                 localStorage.setItem('progress_' + bookId, pageNum);
             }
-            // Epub se actualiza en su propio evento 'relocated'
         }
 
-        // --- TEMA ---
         function applyThemeToEpub() {
             if (!epubRendition) return;
             const isDark = htmlElement.classList.contains('dark');
@@ -256,31 +279,6 @@
             applyThemeToEpub(); 
         });
 
-        // --- GESTOS (SWIPE) ---
-        let touchStartX = 0;
-        let touchStartY = 0;
-        const touchThreshold = 50;
-
-        stageEl.addEventListener('touchstart', (e) => {
-            touchStartX = e.changedTouches[0].screenX;
-            touchStartY = e.changedTouches[0].screenY;
-        }, {passive: true});
-
-        stageEl.addEventListener('touchend', (e) => {
-            if (window.innerWidth >= 640) return;
-            let touchEndX = e.changedTouches[0].screenX;
-            let touchEndY = e.changedTouches[0].screenY;
-            handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
-        }, {passive: true});
-
-        function handleSwipe(sx, sy, ex, ey) {
-            const diffX = ex - sx;
-            const diffY = ey - sy;
-            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > touchThreshold) {
-                diffX > 0 ? changePage(-1) : changePage(1);
-            }
-        }
-
         // --- LÓGICA PRINCIPAL ---
         let currentScale = 1.0;
         let pdfDoc = null;
@@ -293,8 +291,9 @@
             setTimeout(hideLoader, 4000);
             const params = new URLSearchParams(window.location.search);
             const rawUrl = params.get('file') || params.get('libro');
-            
-            // Generar ID simple del libro basado en la URL para guardar progreso
+            const title = params.get('title') || params.get('titulo');
+
+            if (title) document.getElementById('title-display').innerText = title;
             if(rawUrl) bookId = btoa(rawUrl.split('/').pop()).substring(0, 10);
 
             if (rawUrl) initReader(rawUrl);
@@ -335,13 +334,10 @@
                 
                 totalPagesEl.innerText = pdfDoc.numPages;
                 
-                // RECUPERAR PROGRESO GUARDADO
                 const savedPage = localStorage.getItem('progress_' + bookId);
-                if(savedPage) {
-                    pageNum = parseInt(savedPage);
-                    console.log("Restaurando página:", pageNum);
-                }
+                if(savedPage) pageNum = parseInt(savedPage);
 
+                // En móvil iniciamos con un zoom moderado para que se vea la hoja completa
                 if (window.innerWidth < 640) currentScale = 0.6; 
                 else currentScale = 1.0;
                 
@@ -357,6 +353,7 @@
                 const canvas = document.getElementById('the-canvas');
                 const ctx = canvas.getContext('2d');
                 const outputScale = window.devicePixelRatio || 1;
+                
                 const viewport = page.getViewport({scale: currentScale});
                 
                 canvas.width = Math.floor(viewport.width * outputScale);
@@ -383,17 +380,10 @@
                 const book = ePub(url);
                 epubRendition = book.renderTo("epub-render", { width: "100%", height: "100%", flow: "paginated" });
                 
-                // Generar ubicaciones para calcular porcentaje
-                book.ready.then(() => {
-                    return book.locations.generate(1000); 
-                }).then(() => {
-                    totalPagesEl.innerText = "%"; // Unidad para epub
-                });
-
+                book.ready.then(() => { return book.locations.generate(1000); }).then(() => { totalPagesEl.innerText = "%"; });
                 hideLoader();
                 document.getElementById('epub-render').classList.remove('hidden');
                 
-                // RECUPERAR PROGRESO EPUB
                 const savedCfi = localStorage.getItem('progress_' + bookId);
                 
                 epubRendition.display(savedCfi || undefined).then(() => {
@@ -402,12 +392,10 @@
                     applyThemeToEpub(); 
                 });
 
-                // Detectar cambio de página en Epub
                 epubRendition.on('relocated', function(location){
                     if(location.start.percentage) {
                         let percent = Math.round(location.start.percentage * 100);
                         pageInput.value = percent;
-                        // Guardar CFI (ubicación exacta epub)
                         localStorage.setItem('progress_' + bookId, location.start.cfi);
                     }
                 });
