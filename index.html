@@ -41,7 +41,6 @@
     </script>
 
     <style>
-        /* Layout flex vertical completo (CÓDIGO 1 ORIGINAL) */
         body { 
             @apply font-sans antialiased bg-qbit-light dark:bg-zinc-900 text-qbit-black dark:text-qbit-white transition-colors duration-300;
             height: 100dvh; 
@@ -49,7 +48,6 @@
             flex-direction: column;
         }
         
-        /* Loader Animation */
         .loader-bar {
             width: 4px;
             height: 24px;
@@ -63,7 +61,6 @@
             50% { height: 40px; opacity: 1; }
         }
 
-        /* Estilos PDF Canvas (CÓDIGO 1 ORIGINAL) */
         #pdf-render {
             @apply flex justify-center w-full h-full overflow-auto p-4 sm:px-16 transition-all duration-300;
             -webkit-overflow-scrolling: touch; 
@@ -90,8 +87,8 @@
             transition: top 0.1s ease-out;
             box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
         }
-
-        /* Estilo input paginación (Nuevo agregado) */
+        
+        /* Estilo para el input de número de página */
         .page-input::-webkit-inner-spin-button, 
         .page-input::-webkit-outer-spin-button { 
             -webkit-appearance: none; 
@@ -177,35 +174,21 @@
 
     </main>
 
-    <footer class="sm:hidden shrink-0 h-14 bg-black border-t border-gray-800 flex items-center justify-between px-6 z-50">
-        <button onclick="changePage(-1)" class="flex items-center gap-2 text-gray-400 hover:text-white active:scale-95 transition">
-            <i data-lucide="chevron-left" class="w-6 h-6"></i>
-            <span class="text-xs font-bold">ANT</span>
-        </button>
-        
-        <div class="h-4 w-px bg-gray-800"></div>
-        
-        <button onclick="changePage(1)" class="flex items-center gap-2 text-qbit-yellow hover:text-yellow-300 active:scale-95 transition">
-            <span class="text-xs font-bold">SIG</span>
-            <i data-lucide="chevron-right" class="w-6 h-6"></i>
-        </button>
-    </footer>
-
     <script>
         lucide.createIcons();
 
-        // --- GESTIÓN DE TEMA, MARCADOR Y PAGINACIÓN ---
+        // --- GESTIÓN DE UI ---
         const themeToggleBtn = document.getElementById('themeToggle');
         const htmlElement = document.documentElement;
-        
-        // Elementos Nuevos
         const pageInput = document.getElementById('page-input');
         const totalPagesEl = document.getElementById('total-pages');
-        let bookId = 'doc_generico'; // ID para guardar en memoria
         
         let rulerActive = false;
         const rulerEl = document.getElementById('reading-ruler');
         const stageEl = document.getElementById('stage');
+        
+        // Identificador único del libro para guardar progreso
+        let bookId = 'doc_generico';
 
         function toggleRuler() {
             rulerActive = !rulerActive;
@@ -222,13 +205,10 @@
         }
 
         stageEl.addEventListener('click', (e) => {
-            if(rulerActive) {
-                rulerEl.style.top = (e.clientY) + 'px'; 
-            }
+            if(rulerActive) rulerEl.style.top = (e.clientY) + 'px'; 
         });
 
-        // --- LÓGICA MEMORIA Y CAMPO DE TEXTO ---
-        // Escuchar "Enter" en el campo de página
+        // INPUT DE PÁGINA (EVENTO ENTER)
         pageInput.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 let target = parseFloat(pageInput.value);
@@ -236,9 +216,10 @@
                     if(target >= 1 && target <= pdfDoc.numPages) {
                         pageNum = Math.floor(target);
                         renderPdfPage(pageNum);
-                        pageInput.blur(); 
+                        pageInput.blur(); // Quitar foco para esconder teclado móvil
                     }
                 } else if (mode === 'epub' && epubRendition) {
+                    // Para Epub usamos porcentaje (0-100)
                     if(target >= 0 && target <= 100) {
                         let cfi = epubRendition.book.locations.cfiFromPercentage(target / 100);
                         epubRendition.display(cfi);
@@ -248,23 +229,20 @@
             }
         });
 
-        // Actualizar visualización y guardar memoria
         function updatePageDisplay() {
             if(mode === 'pdf') {
                 pageInput.value = pageNum;
-                // Guardar
+                // Guardar Progreso en Memoria del Teléfono/PC
                 localStorage.setItem('progress_' + bookId, pageNum);
             }
+            // Epub se actualiza en su propio evento 'relocated'
         }
 
+        // --- TEMA ---
         function applyThemeToEpub() {
             if (!epubRendition) return;
             const isDark = htmlElement.classList.contains('dark');
-            if (isDark) {
-                epubRendition.themes.select("dark");
-            } else {
-                epubRendition.themes.select("qbit");
-            }
+            epubRendition.themes.select(isDark ? "dark" : "qbit");
         }
 
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -278,6 +256,31 @@
             applyThemeToEpub(); 
         });
 
+        // --- GESTOS (SWIPE) ---
+        let touchStartX = 0;
+        let touchStartY = 0;
+        const touchThreshold = 50;
+
+        stageEl.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, {passive: true});
+
+        stageEl.addEventListener('touchend', (e) => {
+            if (window.innerWidth >= 640) return;
+            let touchEndX = e.changedTouches[0].screenX;
+            let touchEndY = e.changedTouches[0].screenY;
+            handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+        }, {passive: true});
+
+        function handleSwipe(sx, sy, ex, ey) {
+            const diffX = ex - sx;
+            const diffY = ey - sy;
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > touchThreshold) {
+                diffX > 0 ? changePage(-1) : changePage(1);
+            }
+        }
+
         // --- LÓGICA PRINCIPAL ---
         let currentScale = 1.0;
         let pdfDoc = null;
@@ -288,27 +291,20 @@
 
         window.onload = function() {
             setTimeout(hideLoader, 4000);
-
             const params = new URLSearchParams(window.location.search);
             const rawUrl = params.get('file') || params.get('libro');
-            const title = params.get('title') || params.get('titulo');
-
-            if (title) document.getElementById('title-display').innerText = title;
-
-            // Generar ID único para guardar progreso
+            
+            // Generar ID simple del libro basado en la URL para guardar progreso
             if(rawUrl) bookId = btoa(rawUrl.split('/').pop()).substring(0, 10);
 
-            if (rawUrl) {
-                initReader(rawUrl);
-            } else {
+            if (rawUrl) initReader(rawUrl);
+            else {
                 hideLoader();
                 document.getElementById('empty-state').classList.remove('hidden');
             }
         };
 
-        function hideLoader() {
-            document.getElementById('loader').classList.add('hidden-loader');
-        }
+        function hideLoader() { document.getElementById('loader').classList.add('hidden-loader'); }
 
         function initReader(rawUrl) {
             let url = rawUrl;
@@ -316,7 +312,6 @@
                 const parts = url.split("/");
                 if(parts.length >= 5) url = `https://docs.wixstatic.com/ugd/${parts[4]}`;
             }
-            
             console.log("Abriendo:", url);
             let ext = 'pdf';
             try { ext = url.split('?')[0].split('.').pop().toLowerCase(); } catch(e){}
@@ -338,25 +333,21 @@
                 document.getElementById('pdf-render').classList.remove('hidden');
                 document.getElementById('pdf-render').classList.add('flex');
                 
-                // Mostrar Total Páginas
                 totalPagesEl.innerText = pdfDoc.numPages;
-
-                // RECUPERAR MEMORIA LOCAL
+                
+                // RECUPERAR PROGRESO GUARDADO
                 const savedPage = localStorage.getItem('progress_' + bookId);
                 if(savedPage) {
                     pageNum = parseInt(savedPage);
+                    console.log("Restaurando página:", pageNum);
                 }
 
-                // AJUSTE ZOOM MÓVIL (Original)
-                if (window.innerWidth < 640) {
-                    currentScale = 0.6; 
-                } else {
-                    currentScale = 1.0;
-                }
+                if (window.innerWidth < 640) currentScale = 0.6; 
+                else currentScale = 1.0;
                 
                 renderPdfPage(pageNum);
             } catch (error) {
-                console.warn("Error PDF, usando fallback", error);
+                console.warn("Error PDF", error);
                 loadFallback(url);
             }
         }
@@ -366,7 +357,6 @@
                 const canvas = document.getElementById('the-canvas');
                 const ctx = canvas.getContext('2d');
                 const outputScale = window.devicePixelRatio || 1;
-                
                 const viewport = page.getViewport({scale: currentScale});
                 
                 canvas.width = Math.floor(viewport.width * outputScale);
@@ -374,15 +364,12 @@
                 canvas.style.width = Math.floor(viewport.width) + "px";
                 canvas.style.height = Math.floor(viewport.height) + "px";
                 
-                const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
-
                 page.render({
                     canvasContext: ctx,
-                    transform: transform,
+                    transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null,
                     viewport: viewport
                 });
-
-                // Actualizar número en el input
+                
                 updatePageDisplay();
             });
         }
@@ -396,39 +383,31 @@
                 const book = ePub(url);
                 epubRendition = book.renderTo("epub-render", { width: "100%", height: "100%", flow: "paginated" });
                 
-                // Generar ubicaciones para porcentaje
+                // Generar ubicaciones para calcular porcentaje
                 book.ready.then(() => {
                     return book.locations.generate(1000); 
                 }).then(() => {
-                    totalPagesEl.innerText = "%"; 
+                    totalPagesEl.innerText = "%"; // Unidad para epub
                 });
 
                 hideLoader();
                 document.getElementById('epub-render').classList.remove('hidden');
                 
-                // RECUPERAR MEMORIA LOCAL EPUB
+                // RECUPERAR PROGRESO EPUB
                 const savedCfi = localStorage.getItem('progress_' + bookId);
-
+                
                 epubRendition.display(savedCfi || undefined).then(() => {
-                    epubRendition.themes.register("qbit", { 
-                        body: { "font-family": "Inter, sans-serif", "color": "#111", "padding": "0 20px" },
-                        p: { "font-size": "18px", "line-height": "1.6" }
-                    });
-                    
-                    epubRendition.themes.register("dark", { 
-                        body: { "font-family": "Inter, sans-serif", "color": "#e5e5e5", "background-color": "#121212 !important", "padding": "0 20px" },
-                        p: { "font-size": "18px", "line-height": "1.6" }
-                    });
-                    
+                    epubRendition.themes.register("qbit", { body: { "font-family": "Inter, sans-serif", "color": "#111", "padding": "0 20px" }, p: { "font-size": "18px", "line-height": "1.6" } });
+                    epubRendition.themes.register("dark", { body: { "font-family": "Inter, sans-serif", "color": "#e5e5e5", "background-color": "#121212 !important", "padding": "0 20px" }, p: { "font-size": "18px", "line-height": "1.6" } });
                     applyThemeToEpub(); 
                 });
 
-                // Guardar progreso al cambiar página
+                // Detectar cambio de página en Epub
                 epubRendition.on('relocated', function(location){
                     if(location.start.percentage) {
                         let percent = Math.round(location.start.percentage * 100);
                         pageInput.value = percent;
-                        // Guardar CFI
+                        // Guardar CFI (ubicación exacta epub)
                         localStorage.setItem('progress_' + bookId, location.start.cfi);
                     }
                 });
@@ -438,7 +417,6 @@
             }
         }
 
-        // FALLBACK
         function loadFallback(url) {
             setMode('google');
             hideLoader();
@@ -447,14 +425,12 @@
             iframe.src = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
         }
 
-        // UTILIDADES
         function setMode(newMode) {
             mode = newMode;
             document.getElementById('pdf-render').classList.add('hidden');
             document.getElementById('pdf-render').classList.remove('flex');
             document.getElementById('epub-render').classList.add('hidden');
             document.getElementById('fallback-frame').classList.add('hidden');
-            document.getElementById('format-tag').innerText = newMode.toUpperCase();
         }
 
         function changePage(dir) {
