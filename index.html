@@ -91,6 +91,13 @@
             transition: top 0.1s ease-out;
             box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
         }
+
+        /* ESTILO NUEVO: Para el input de página */
+        .page-input::-webkit-inner-spin-button, 
+        .page-input::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
     </style>
 </head>
 <body oncontextmenu="return false;">
@@ -119,9 +126,11 @@
             
             <div class="h-6 w-px bg-gray-700 hidden sm:block"></div>
             
-            <div class="flex flex-col justify-center">
-                <span id="format-tag" class="text-[10px] font-mono bg-gray-800 px-1.5 py-0.5 rounded text-qbit-yellow uppercase tracking-wide w-fit">READER</span>
-                <h1 id="title-display" class="text-sm font-semibold text-gray-300 truncate max-w-[150px] sm:max-w-xs">Cargando...</h1>
+            <div class="flex items-center bg-gray-900 border border-gray-700 rounded px-2 py-1 gap-1">
+                <span class="text-[10px] font-mono text-gray-500 uppercase hidden sm:inline">PÁG</span>
+                <input type="number" id="page-input" value="1" min="1" class="page-input w-8 sm:w-10 bg-transparent text-center text-sm font-bold text-white focus:outline-none focus:text-qbit-yellow placeholder-gray-600">
+                <span class="text-gray-500 text-sm">/</span>
+                <span id="total-pages" class="text-gray-400 text-sm font-mono">--</span>
             </div>
         </div>
 
@@ -190,6 +199,11 @@
         const themeToggleBtn = document.getElementById('themeToggle');
         const htmlElement = document.documentElement;
         
+        // Elementos Nuevos
+        const pageInput = document.getElementById('page-input');
+        const totalPagesEl = document.getElementById('total-pages');
+        let bookId = 'doc_generico'; // Variable para memoria
+
         let rulerActive = false;
         const rulerEl = document.getElementById('reading-ruler');
         const stageEl = document.getElementById('stage');
@@ -210,11 +224,37 @@
 
         stageEl.addEventListener('click', (e) => {
             if(rulerActive) {
-                // Ajustamos posición (Header es 64px)
-                // e.clientY da la posición en ventana, restamos el header para colocarlo bien relativo o absoluto
                 rulerEl.style.top = (e.clientY) + 'px'; 
             }
         });
+
+        // --- FUNCIONES DE MEMORIA Y PÁGINA (AÑADIDAS) ---
+        pageInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                let target = parseFloat(pageInput.value);
+                if(mode === 'pdf') {
+                    if(target >= 1 && target <= pdfDoc.numPages) {
+                        pageNum = Math.floor(target);
+                        renderPdfPage(pageNum);
+                        pageInput.blur(); 
+                    }
+                } else if (mode === 'epub' && epubRendition) {
+                    if(target >= 0 && target <= 100) {
+                        let cfi = epubRendition.book.locations.cfiFromPercentage(target / 100);
+                        epubRendition.display(cfi);
+                        pageInput.blur();
+                    }
+                }
+            }
+        });
+
+        function updatePageDisplay() {
+            if(mode === 'pdf') {
+                pageInput.value = pageNum;
+                // Guardar memoria
+                localStorage.setItem('progress_' + bookId, pageNum);
+            }
+        }
 
         function applyThemeToEpub() {
             if (!epubRendition) return;
@@ -253,6 +293,9 @@
             const title = params.get('title') || params.get('titulo');
 
             if (title) document.getElementById('title-display').innerText = title;
+            
+            // Generar ID único para memoria
+            if(rawUrl) bookId = btoa(rawUrl.split('/').pop()).substring(0, 10);
 
             if (rawUrl) {
                 initReader(rawUrl);
@@ -294,6 +337,15 @@
                 document.getElementById('pdf-render').classList.remove('hidden');
                 document.getElementById('pdf-render').classList.add('flex');
                 
+                // Mostrar Total Páginas
+                totalPagesEl.innerText = pdfDoc.numPages;
+
+                // RECUPERAR MEMORIA LOCAL
+                const savedPage = localStorage.getItem('progress_' + bookId);
+                if(savedPage) {
+                    pageNum = parseInt(savedPage);
+                }
+
                 // AJUSTE ZOOM MÓVIL
                 if (window.innerWidth < 640) {
                     currentScale = 0.6; 
@@ -301,7 +353,7 @@
                     currentScale = 1.0;
                 }
                 
-                renderPdfPage(1);
+                renderPdfPage(pageNum);
             } catch (error) {
                 console.warn("Error PDF, usando fallback", error);
                 loadFallback(url);
@@ -328,6 +380,9 @@
                     transform: transform,
                     viewport: viewport
                 });
+
+                // Actualizar número en el input
+                updatePageDisplay();
             });
         }
 
@@ -340,10 +395,20 @@
                 const book = ePub(url);
                 epubRendition = book.renderTo("epub-render", { width: "100%", height: "100%", flow: "paginated" });
                 
+                // Generar total páginas (porcentaje)
+                book.ready.then(() => {
+                    return book.locations.generate(1000); 
+                }).then(() => {
+                    totalPagesEl.innerText = "%"; 
+                });
+
                 hideLoader();
                 document.getElementById('epub-render').classList.remove('hidden');
                 
-                epubRendition.display().then(() => {
+                // RECUPERAR MEMORIA EPUB
+                const savedCfi = localStorage.getItem('progress_' + bookId);
+
+                epubRendition.display(savedCfi || undefined).then(() => {
                     epubRendition.themes.register("qbit", { 
                         body: { "font-family": "Inter, sans-serif", "color": "#111", "padding": "0 20px" },
                         p: { "font-size": "18px", "line-height": "1.6" }
@@ -356,6 +421,17 @@
                     
                     applyThemeToEpub(); 
                 });
+
+                // Guardar al cambiar página
+                epubRendition.on('relocated', function(location){
+                    if(location.start.percentage) {
+                        let percent = Math.round(location.start.percentage * 100);
+                        pageInput.value = percent;
+                        // Guardar en memoria
+                        localStorage.setItem('progress_' + bookId, location.start.cfi);
+                    }
+                });
+
             } catch (e) {
                 loadFallback(url);
             }
