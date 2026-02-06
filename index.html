@@ -41,7 +41,7 @@
     </script>
 
     <style>
-        /* Layout flex vertical completo que ocupa el 100% de la altura visible real */
+        /* Layout flex vertical completo */
         body { 
             @apply font-sans antialiased bg-qbit-light dark:bg-zinc-900 text-qbit-black dark:text-qbit-white transition-colors duration-300;
             height: 100dvh; 
@@ -65,7 +65,6 @@
 
         /* Estilos PDF Canvas */
         #pdf-render {
-            /* Eliminamos paddings excesivos porque ahora el layout es seguro */
             @apply flex justify-center w-full h-full overflow-auto p-4 sm:px-16 transition-all duration-300;
             -webkit-overflow-scrolling: touch; 
         }
@@ -92,7 +91,7 @@
             box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
         }
 
-        /* ESTILO NUEVO: Para el input de página */
+        /* Input de página */
         .page-input::-webkit-inner-spin-button, 
         .page-input::-webkit-outer-spin-button { 
             -webkit-appearance: none; 
@@ -116,17 +115,25 @@
     <div id="reading-ruler" class="hidden fixed left-0 right-0 h-8 bg-qbit-yellow/30 border-y border-qbit-yellow/60 z-30 mix-blend-multiply dark:mix-blend-difference"></div>
 
     <header class="h-16 shrink-0 bg-black text-white border-b border-gray-800 flex items-center justify-between px-4 z-50 shadow-lg relative">
-        <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2">
+        <div class="flex items-center gap-4 flex-1 overflow-hidden">
+            <!-- LOGO -->
+            <div class="flex items-center gap-2 shrink-0">
                 <div class="w-8 h-8 bg-qbit-yellow flex items-center justify-center rounded-sm text-black">
                     <span class="font-bold text-lg leading-none">Q</span>
                 </div>
                 <span class="hidden md:block font-bold tracking-tighter text-lg text-white">Q-BIT</span>
             </div>
             
-            <div class="h-6 w-px bg-gray-700 hidden sm:block"></div>
+            <div class="h-6 w-px bg-gray-700 hidden sm:block shrink-0"></div>
             
-            <div class="flex items-center bg-gray-900 border border-gray-700 rounded px-2 py-1 gap-1">
+            <!-- TITULO Y TAG (Restaurados) -->
+            <div class="flex flex-col justify-center min-w-0 shrink">
+                <span id="format-tag" class="text-[10px] font-mono bg-gray-800 px-1.5 py-0.5 rounded text-qbit-yellow uppercase tracking-wide w-fit">READER</span>
+                <h1 id="title-display" class="text-sm font-semibold text-gray-300 truncate max-w-[150px] sm:max-w-xs">Cargando...</h1>
+            </div>
+
+            <!-- CONTADOR DE PAGINAS (Nuevo) -->
+            <div class="flex items-center bg-gray-900 border border-gray-700 rounded px-2 py-1 gap-1 ml-2 shrink-0">
                 <span class="text-[10px] font-mono text-gray-500 uppercase hidden sm:inline">PÁG</span>
                 <input type="number" id="page-input" value="1" min="1" class="page-input w-8 sm:w-10 bg-transparent text-center text-sm font-bold text-white focus:outline-none focus:text-qbit-yellow placeholder-gray-600">
                 <span class="text-gray-500 text-sm">/</span>
@@ -134,7 +141,8 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-3">
+        <!-- HERRAMIENTAS -->
+        <div class="flex items-center gap-2 sm:gap-3 shrink-0 ml-2">
             <button onclick="toggleRuler()" id="btn-ruler" title="Activar Marcador" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-800 text-gray-400 hover:text-qbit-yellow transition">
                 <i data-lucide="ruler" class="w-5 h-5"></i>
             </button>
@@ -228,7 +236,7 @@
             }
         });
 
-        // --- FUNCIONES DE MEMORIA Y PÁGINA (AÑADIDAS) ---
+        // --- FUNCIONES DE MEMORIA Y PÁGINA ---
         pageInput.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 let target = parseFloat(pageInput.value);
@@ -292,7 +300,8 @@
             const rawUrl = params.get('file') || params.get('libro');
             const title = params.get('title') || params.get('titulo');
 
-            if (title) document.getElementById('title-display').innerText = title;
+            const titleEl = document.getElementById('title-display');
+            if (title && titleEl) titleEl.innerText = title;
             
             // Generar ID único para memoria
             if(rawUrl) bookId = btoa(rawUrl.split('/').pop()).substring(0, 10);
@@ -338,7 +347,7 @@
                 document.getElementById('pdf-render').classList.add('flex');
                 
                 // Mostrar Total Páginas
-                totalPagesEl.innerText = pdfDoc.numPages;
+                if(totalPagesEl) totalPagesEl.innerText = pdfDoc.numPages;
 
                 // RECUPERAR MEMORIA LOCAL
                 const savedPage = localStorage.getItem('progress_' + bookId);
@@ -399,7 +408,7 @@
                 book.ready.then(() => {
                     return book.locations.generate(1000); 
                 }).then(() => {
-                    totalPagesEl.innerText = "%"; 
+                    if(totalPagesEl) totalPagesEl.innerText = "%"; 
                 });
 
                 hideLoader();
@@ -426,7 +435,7 @@
                 epubRendition.on('relocated', function(location){
                     if(location.start.percentage) {
                         let percent = Math.round(location.start.percentage * 100);
-                        pageInput.value = percent;
+                        if(pageInput) pageInput.value = percent;
                         // Guardar en memoria
                         localStorage.setItem('progress_' + bookId, location.start.cfi);
                     }
@@ -453,7 +462,10 @@
             document.getElementById('pdf-render').classList.remove('flex');
             document.getElementById('epub-render').classList.add('hidden');
             document.getElementById('fallback-frame').classList.add('hidden');
-            document.getElementById('format-tag').innerText = newMode.toUpperCase();
+            
+            // PROTECCIÓN CONTRA ERRORES
+            const tag = document.getElementById('format-tag');
+            if(tag) tag.innerText = newMode.toUpperCase();
         }
 
         function changePage(dir) {
