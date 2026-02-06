@@ -13,8 +13,12 @@
                 extend: {
                     colors: {
                         qbit: {
-                            black: '#000000', dark: '#171717', gray: '#262626',
-                            white: '#ffffff', light: '#f5f5f7', yellow: '#FACC15',
+                            black: '#000000',
+                            dark: '#171717',
+                            gray: '#262626',
+                            white: '#ffffff',
+                            light: '#f5f5f7',
+                            yellow: '#FACC15',
                         }
                     },
                     fontFamily: {
@@ -32,21 +36,24 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 
     <style>
-        /* ESTRUCTURA IDÉNTICA AL CÓDIGO 1 */
+        /* Layout flex vertical completo que ocupa el 100% de la altura visible real */
         body { 
             @apply font-sans antialiased bg-qbit-light dark:bg-zinc-900 text-qbit-black dark:text-qbit-white transition-colors duration-300;
-            /* Usamos 100dvh para asegurar que en móvil respete las barras del navegador */
             height: 100dvh; 
             display: flex;
             flex-direction: column;
-            overflow: hidden; 
         }
         
+        /* Loader Animation */
         .loader-bar {
-            width: 4px; height: 24px; background: #FACC15;
+            width: 4px;
+            height: 24px;
+            background: #FACC15;
             animation: loaderAnim 1s ease-in-out infinite;
         }
         .loader-bar:nth-child(2) { animation-delay: 0.1s; }
@@ -56,7 +63,9 @@
             50% { height: 40px; opacity: 1; }
         }
 
+        /* Estilos PDF Canvas */
         #pdf-render {
+            /* Eliminamos paddings excesivos porque ahora el layout es seguro */
             @apply flex justify-center w-full h-full overflow-auto p-4 sm:px-16 transition-all duration-300;
             -webkit-overflow-scrolling: touch; 
         }
@@ -64,24 +73,33 @@
             @apply shadow-2xl max-w-full transition-all duration-300 bg-white; 
         }
         
-        .dark canvas { filter: invert(1) hue-rotate(180deg) contrast(0.8); }
+        .dark canvas {
+            filter: invert(1) hue-rotate(180deg) contrast(0.8);
+        }
         
-        #loader { transition: opacity 0.5s ease-out, visibility 0.5s; }
-        #loader.hidden-loader { opacity: 0; visibility: hidden; pointer-events: none; }
-
-        #reading-ruler {
-            pointer-events: none; transition: top 0.1s ease-out; box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
+        #loader {
+            transition: opacity 0.5s ease-out, visibility 0.5s;
+        }
+        #loader.hidden-loader {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
         }
 
-        /* Estilo input */
-        .page-input::-webkit-inner-spin-button, .page-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        #reading-ruler {
+            pointer-events: none;
+            transition: top 0.1s ease-out;
+            box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
+        }
     </style>
 </head>
 <body oncontextmenu="return false;">
 
     <div id="loader" class="fixed inset-0 z-[999] bg-qbit-light dark:bg-black flex flex-col justify-center items-center">
         <div class="flex gap-2 items-center mb-4">
-            <div class="loader-bar"></div><div class="loader-bar"></div><div class="loader-bar"></div>
+            <div class="loader-bar"></div>
+            <div class="loader-bar"></div>
+            <div class="loader-bar"></div>
         </div>
         <div class="font-mono text-sm text-gray-500 dark:text-gray-400 uppercase tracking-widest animate-pulse" id="status-msg">
             INICIALIZANDO...
@@ -90,26 +108,24 @@
 
     <div id="reading-ruler" class="hidden fixed left-0 right-0 h-8 bg-qbit-yellow/30 border-y border-qbit-yellow/60 z-30 mix-blend-multiply dark:mix-blend-difference"></div>
 
-    <header class="h-16 shrink-0 bg-black text-white border-b border-gray-800 flex items-center justify-between px-3 sm:px-4 z-50 shadow-lg relative">
-        <div class="flex items-center gap-3 sm:gap-4 overflow-hidden">
-            <div class="flex items-center gap-2 shrink-0">
+    <header class="h-16 shrink-0 bg-black text-white border-b border-gray-800 flex items-center justify-between px-4 z-50 shadow-lg relative">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
                 <div class="w-8 h-8 bg-qbit-yellow flex items-center justify-center rounded-sm text-black">
                     <span class="font-bold text-lg leading-none">Q</span>
                 </div>
-                <span class="hidden lg:block font-bold tracking-tighter text-lg text-white">Q-BIT</span>
+                <span class="hidden md:block font-bold tracking-tighter text-lg text-white">Q-BIT</span>
             </div>
             
             <div class="h-6 w-px bg-gray-700 hidden sm:block"></div>
             
-            <div class="flex items-center bg-gray-900 border border-gray-700 rounded px-2 py-1 gap-1">
-                <span class="text-[10px] font-mono text-gray-500 uppercase hidden sm:inline">PÁG</span>
-                <input type="number" id="page-input" value="1" min="1" class="page-input w-8 sm:w-10 bg-transparent text-center text-sm font-bold text-white focus:outline-none focus:text-qbit-yellow placeholder-gray-600">
-                <span class="text-gray-500 text-sm">/</span>
-                <span id="total-pages" class="text-gray-400 text-sm font-mono">--</span>
+            <div class="flex flex-col justify-center">
+                <span id="format-tag" class="text-[10px] font-mono bg-gray-800 px-1.5 py-0.5 rounded text-qbit-yellow uppercase tracking-wide w-fit">READER</span>
+                <h1 id="title-display" class="text-sm font-semibold text-gray-300 truncate max-w-[150px] sm:max-w-xs">Cargando...</h1>
             </div>
         </div>
 
-        <div class="flex items-center gap-2 sm:gap-3">
+        <div class="flex items-center gap-3">
             <button onclick="toggleRuler()" id="btn-ruler" title="Activar Marcador" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-800 text-gray-400 hover:text-qbit-yellow transition">
                 <i data-lucide="ruler" class="w-5 h-5"></i>
             </button>
@@ -131,7 +147,7 @@
         </div>
     </header>
 
-    <main id="stage" class="flex-1 min-h-0 relative flex justify-center items-start overflow-hidden bg-qbit-light dark:bg-[#121212] w-full">
+    <main id="stage" class="flex-1 relative flex justify-center items-start overflow-hidden bg-qbit-light dark:bg-[#121212] w-full">
         
         <button onclick="changePage(-1)" class="absolute left-4 top-1/2 -translate-y-1/2 z-40 w-12 h-12 rounded-full hidden sm:flex items-center justify-center text-gray-400 hover:text-black hover:bg-white hover:shadow-xl dark:hover:text-qbit-yellow dark:hover:bg-gray-900 transition-all duration-300 opacity-50 hover:opacity-100 group">
             <i data-lucide="chevron-left" class="w-8 h-8 group-hover:scale-110 transition"></i>
@@ -150,6 +166,7 @@
             </div>
             <p class="text-sm font-mono text-gray-500">SISTEMA EN ESPERA</p>
         </div>
+
     </main>
 
     <footer class="sm:hidden shrink-0 h-14 bg-black border-t border-gray-800 flex items-center justify-between px-6 z-50">
@@ -168,14 +185,11 @@
 
     <script>
         lucide.createIcons();
+
+        // --- GESTIÓN DE TEMA Y MARCADOR ---
         const themeToggleBtn = document.getElementById('themeToggle');
         const htmlElement = document.documentElement;
         
-        // Elementos Nuevos
-        const pageInput = document.getElementById('page-input');
-        const totalPagesEl = document.getElementById('total-pages');
-        let bookId = 'doc_generico';
-
         let rulerActive = false;
         const rulerEl = document.getElementById('reading-ruler');
         const stageEl = document.getElementById('stage');
@@ -184,42 +198,38 @@
             rulerActive = !rulerActive;
             const btn = document.getElementById('btn-ruler');
             if(rulerActive) {
-                rulerEl.classList.remove('hidden'); btn.classList.add('text-qbit-yellow', 'bg-gray-800'); stageEl.style.cursor = 'crosshair';
+                rulerEl.classList.remove('hidden');
+                btn.classList.add('text-qbit-yellow', 'bg-gray-800');
+                stageEl.style.cursor = 'crosshair';
             } else {
-                rulerEl.classList.add('hidden'); btn.classList.remove('text-qbit-yellow', 'bg-gray-800'); stageEl.style.cursor = 'default';
+                rulerEl.classList.add('hidden');
+                btn.classList.remove('text-qbit-yellow', 'bg-gray-800');
+                stageEl.style.cursor = 'default';
             }
         }
-        stageEl.addEventListener('click', (e) => { if(rulerActive) rulerEl.style.top = (e.clientY) + 'px'; });
 
-        // --- LÓGICA MEMORIA Y CAMPO DE TEXTO ---
-        pageInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                let target = parseFloat(pageInput.value);
-                if(mode === 'pdf' && target >= 1 && target <= pdfDoc.numPages) {
-                    pageNum = Math.floor(target); renderPdfPage(pageNum); pageInput.blur();
-                } else if (mode === 'epub' && epubRendition && target >= 0 && target <= 100) {
-                    let cfi = epubRendition.book.locations.cfiFromPercentage(target / 100);
-                    epubRendition.display(cfi); pageInput.blur();
-                }
+        stageEl.addEventListener('click', (e) => {
+            if(rulerActive) {
+                // Ajustamos posición (Header es 64px)
+                // e.clientY da la posición en ventana, restamos el header para colocarlo bien relativo o absoluto
+                rulerEl.style.top = (e.clientY) + 'px'; 
             }
         });
 
-        function updatePageDisplay() {
-            if(mode === 'pdf') {
-                pageInput.value = pageNum;
-                localStorage.setItem('progress_' + bookId, pageNum);
-            }
-        }
-
-        // --- TEMA ---
         function applyThemeToEpub() {
             if (!epubRendition) return;
             const isDark = htmlElement.classList.contains('dark');
-            epubRendition.themes.select(isDark ? "dark" : "qbit");
+            if (isDark) {
+                epubRendition.themes.select("dark");
+            } else {
+                epubRendition.themes.select("qbit");
+            }
         }
+
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             htmlElement.classList.add('dark');
         }
+
         themeToggleBtn.addEventListener('click', () => {
             htmlElement.classList.toggle('dark');
             const isDark = htmlElement.classList.contains('dark');
@@ -227,7 +237,7 @@
             applyThemeToEpub(); 
         });
 
-        // --- MOTORES ---
+        // --- LÓGICA PRINCIPAL ---
         let currentScale = 1.0;
         let pdfDoc = null;
         let pageNum = 1;
@@ -237,18 +247,24 @@
 
         window.onload = function() {
             setTimeout(hideLoader, 4000);
+
             const params = new URLSearchParams(window.location.search);
             const rawUrl = params.get('file') || params.get('libro');
             const title = params.get('title') || params.get('titulo');
 
             if (title) document.getElementById('title-display').innerText = title;
-            if(rawUrl) bookId = btoa(rawUrl.split('/').pop()).substring(0, 10);
 
-            if (rawUrl) initReader(rawUrl);
-            else { hideLoader(); document.getElementById('empty-state').classList.remove('hidden'); }
+            if (rawUrl) {
+                initReader(rawUrl);
+            } else {
+                hideLoader();
+                document.getElementById('empty-state').classList.remove('hidden');
+            }
         };
 
-        function hideLoader() { document.getElementById('loader').classList.add('hidden-loader'); }
+        function hideLoader() {
+            document.getElementById('loader').classList.add('hidden-loader');
+        }
 
         function initReader(rawUrl) {
             let url = rawUrl;
@@ -256,6 +272,7 @@
                 const parts = url.split("/");
                 if(parts.length >= 5) url = `https://docs.wixstatic.com/ugd/${parts[4]}`;
             }
+            
             console.log("Abriendo:", url);
             let ext = 'pdf';
             try { ext = url.split('?')[0].split('.').pop().toLowerCase(); } catch(e){}
@@ -264,9 +281,11 @@
             else loadPdfPro(url);
         }
 
+        // MOTOR PDF
         async function loadPdfPro(url) {
             setMode('pdf');
             document.getElementById('status-msg').innerText = "PROCESANDO PDF...";
+            
             try {
                 const loadingTask = pdfjsLib.getDocument(url);
                 pdfDoc = await loadingTask.promise;
@@ -275,14 +294,16 @@
                 document.getElementById('pdf-render').classList.remove('hidden');
                 document.getElementById('pdf-render').classList.add('flex');
                 
-                totalPagesEl.innerText = pdfDoc.numPages;
-                const savedPage = localStorage.getItem('progress_' + bookId);
-                if(savedPage) pageNum = parseInt(savedPage);
-
-                if (window.innerWidth < 640) currentScale = 0.6; else currentScale = 1.0;
-                renderPdfPage(pageNum);
+                // AJUSTE ZOOM MÓVIL
+                if (window.innerWidth < 640) {
+                    currentScale = 0.6; 
+                } else {
+                    currentScale = 1.0;
+                }
+                
+                renderPdfPage(1);
             } catch (error) {
-                console.warn("Error PDF", error);
+                console.warn("Error PDF, usando fallback", error);
                 loadFallback(url);
             }
         }
@@ -292,6 +313,7 @@
                 const canvas = document.getElementById('the-canvas');
                 const ctx = canvas.getContext('2d');
                 const outputScale = window.devicePixelRatio || 1;
+                
                 const viewport = page.getViewport({scale: currentScale});
                 
                 canvas.width = Math.floor(viewport.width * outputScale);
@@ -299,43 +321,47 @@
                 canvas.style.width = Math.floor(viewport.width) + "px";
                 canvas.style.height = Math.floor(viewport.height) + "px";
                 
+                const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+
                 page.render({
                     canvasContext: ctx,
-                    transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null,
+                    transform: transform,
                     viewport: viewport
                 });
-                updatePageDisplay();
             });
         }
 
+        // MOTOR EPUB
         function loadEpub(url) {
             setMode('epub');
             document.getElementById('status-msg').innerText = "ABRIENDO EBOOK...";
+            
             try {
                 const book = ePub(url);
                 epubRendition = book.renderTo("epub-render", { width: "100%", height: "100%", flow: "paginated" });
                 
-                book.ready.then(() => { return book.locations.generate(1000); }).then(() => { totalPagesEl.innerText = "%"; });
                 hideLoader();
                 document.getElementById('epub-render').classList.remove('hidden');
                 
-                const savedCfi = localStorage.getItem('progress_' + bookId);
-                epubRendition.display(savedCfi || undefined).then(() => {
-                    epubRendition.themes.register("qbit", { body: { "font-family": "Inter, sans-serif", "color": "#111", "padding": "0 20px" }, p: { "font-size": "18px", "line-height": "1.6" } });
-                    epubRendition.themes.register("dark", { body: { "font-family": "Inter, sans-serif", "color": "#e5e5e5", "background-color": "#121212 !important", "padding": "0 20px" }, p: { "font-size": "18px", "line-height": "1.6" } });
+                epubRendition.display().then(() => {
+                    epubRendition.themes.register("qbit", { 
+                        body: { "font-family": "Inter, sans-serif", "color": "#111", "padding": "0 20px" },
+                        p: { "font-size": "18px", "line-height": "1.6" }
+                    });
+                    
+                    epubRendition.themes.register("dark", { 
+                        body: { "font-family": "Inter, sans-serif", "color": "#e5e5e5", "background-color": "#121212 !important", "padding": "0 20px" },
+                        p: { "font-size": "18px", "line-height": "1.6" }
+                    });
+                    
                     applyThemeToEpub(); 
                 });
-
-                epubRendition.on('relocated', function(location){
-                    if(location.start.percentage) {
-                        let percent = Math.round(location.start.percentage * 100);
-                        pageInput.value = percent;
-                        localStorage.setItem('progress_' + bookId, location.start.cfi);
-                    }
-                });
-            } catch (e) { loadFallback(url); }
+            } catch (e) {
+                loadFallback(url);
+            }
         }
 
+        // FALLBACK
         function loadFallback(url) {
             setMode('google');
             hideLoader();
@@ -344,6 +370,7 @@
             iframe.src = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
         }
 
+        // UTILIDADES
         function setMode(newMode) {
             mode = newMode;
             document.getElementById('pdf-render').classList.add('hidden');
@@ -380,7 +407,10 @@
             }
         }
 
-        function closeReader() { try { window.close(); } catch(e){} window.history.back(); }
+        function closeReader() {
+            try { window.close(); } catch(e){}
+            window.history.back();
+        }
     </script>
 </body>
 </html>
