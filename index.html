@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Q-BIT | Reader System</title>
+    <title>Q-BIT | Advanced Reader System</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -17,22 +17,25 @@
                             dark: '#171717',
                             gray: '#262626',
                             white: '#ffffff',
-                            light: '#f5f5f7',
+                            light: '#f8fafc',
                             yellow: '#FACC15',
+                            cyan: '#06b6d4',
+                            blue: '#3b82f6'
                         }
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
-                        mono: ['Space Mono', 'monospace'],
+                        mono: ['JetBrains Mono', 'Space Mono', 'monospace'],
                     }
                 }
             }
         }
     </script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     
+    <!-- LIBRERÍAS DE LECTURA -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -43,24 +46,24 @@
     <style>
         /* Layout flex vertical completo */
         body { 
-            @apply font-sans antialiased bg-qbit-light dark:bg-zinc-900 text-qbit-black dark:text-qbit-white transition-colors duration-300;
+            @apply font-sans antialiased bg-qbit-light dark:bg-[#0f172a] text-qbit-black dark:text-gray-200 transition-colors duration-300;
             height: 100dvh; 
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
         
         /* Loader Animation */
         .loader-bar {
-            width: 4px;
-            height: 24px;
-            background: #FACC15;
+            width: 6px; height: 24px; background: #FACC15;
             animation: loaderAnim 1s ease-in-out infinite;
+            border-radius: 3px;
         }
-        .loader-bar:nth-child(2) { animation-delay: 0.1s; }
-        .loader-bar:nth-child(3) { animation-delay: 0.2s; }
+        .loader-bar:nth-child(2) { animation-delay: 0.15s; background: #06b6d4;}
+        .loader-bar:nth-child(3) { animation-delay: 0.3s; background: #3b82f6;}
         @keyframes loaderAnim {
-            0%, 100% { height: 24px; opacity: 0.5; }
-            50% { height: 40px; opacity: 1; }
+            0%, 100% { transform: scaleY(1); opacity: 0.5; }
+            50% { transform: scaleY(2); opacity: 1; }
         }
 
         /* Estilos PDF Canvas */
@@ -69,149 +72,250 @@
             -webkit-overflow-scrolling: touch; 
         }
         canvas {
-            @apply shadow-2xl max-w-full transition-all duration-300 bg-white; 
+            @apply shadow-2xl max-w-full transition-all duration-300 bg-white rounded-md; 
         }
         
+        /* Truco para Modo Oscuro en PDF: Invierte colores pero mantiene tonalidades legibles */
         .dark canvas {
-            filter: invert(1) hue-rotate(180deg) contrast(0.8);
+            filter: invert(1) hue-rotate(180deg) contrast(0.85) brightness(1.1);
         }
         
         #loader {
             transition: opacity 0.5s ease-out, visibility 0.5s;
         }
         #loader.hidden-loader {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
+            opacity: 0; visibility: hidden; pointer-events: none;
         }
 
         #reading-ruler {
-            pointer-events: none;
-            transition: top 0.1s ease-out;
-            box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
+            pointer-events: none; transition: top 0.1s ease-out;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+            border-top: 1px solid rgba(6, 182, 212, 0.8);
+            border-bottom: 1px solid rgba(6, 182, 212, 0.8);
+            background: rgba(6, 182, 212, 0.15);
         }
 
-        /* Input de página */
+        /* Ocultar flechas numéricas en input */
         .page-input::-webkit-inner-spin-button, 
         .page-input::-webkit-outer-spin-button { 
-            -webkit-appearance: none; 
-            margin: 0; 
+            -webkit-appearance: none; margin: 0; 
+        }
+
+        /* NOTAS LATERALES (Sidebar) */
+        #notes-sidebar {
+            position: fixed; top: 64px; right: -400px; /* 64px es la altura del header */
+            width: 100%; max-width: 380px; height: calc(100dvh - 64px);
+            background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border-left: 1px solid rgba(250, 204, 21, 0.3);
+            box-shadow: -10px 0 30px rgba(0,0,0,0.5); z-index: 45;
+            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; flex-direction: column;
+        }
+        #notes-sidebar.active { right: 0; }
+
+        /* Estilos del Scrollbar del Panel de Notas */
+        .notes-list-scroll::-webkit-scrollbar { width: 6px; }
+        .notes-list-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        .notes-list-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+        /* Herramientas de Botón */
+        .tool-btn {
+            @apply w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-800 hover:text-qbit-cyan transition-colors duration-200 relative;
+        }
+        .tool-btn.active {
+            @apply bg-gray-800 text-qbit-cyan shadow-[0_0_10px_rgba(6,182,212,0.3)];
         }
     </style>
 </head>
 <body oncontextmenu="return false;">
 
-    <div id="loader" class="fixed inset-0 z-[999] bg-qbit-light dark:bg-black flex flex-col justify-center items-center">
-        <div class="flex gap-2 items-center mb-4">
+    <!-- LOADER -->
+    <div id="loader" class="fixed inset-0 z-[999] bg-white dark:bg-[#020617] flex flex-col justify-center items-center">
+        <div class="flex gap-4 items-center mb-8">
             <div class="loader-bar"></div>
             <div class="loader-bar"></div>
             <div class="loader-bar"></div>
         </div>
         <div class="font-mono text-sm text-gray-500 dark:text-gray-400 uppercase tracking-widest animate-pulse" id="status-msg">
-            INICIALIZANDO...
+            DECRYPTING DOCUMENT...
         </div>
     </div>
 
-    <div id="reading-ruler" class="hidden fixed left-0 right-0 h-8 bg-qbit-yellow/30 border-y border-qbit-yellow/60 z-30 mix-blend-multiply dark:mix-blend-difference"></div>
+    <!-- READING RULER -->
+    <div id="reading-ruler" class="hidden fixed left-0 right-0 h-10 z-30 mix-blend-multiply dark:mix-blend-screen"></div>
 
-    <header class="h-16 shrink-0 bg-black text-white border-b border-gray-800 flex items-center justify-between px-4 z-50 shadow-lg relative">
+    <!-- HEADER BAR -->
+    <header class="h-16 shrink-0 bg-[#020617] text-white border-b border-gray-800 flex items-center justify-between px-4 z-50 shadow-lg relative">
         <div class="flex items-center gap-4 flex-1 overflow-hidden">
             <!-- LOGO -->
             <div class="flex items-center gap-2 shrink-0">
-                <div class="w-8 h-8 bg-qbit-yellow flex items-center justify-center rounded-sm text-black">
-                    <span class="font-bold text-lg leading-none">Q</span>
+                <div class="w-8 h-8 bg-gradient-to-br from-qbit-cyan to-blue-600 flex items-center justify-center rounded text-white shadow-[0_0_10px_rgba(6,182,212,0.5)]">
+                    <span class="font-bold text-lg leading-none font-mono">Q</span>
                 </div>
-                <span class="hidden md:block font-bold tracking-tighter text-lg text-white">Q-BIT</span>
+                <span class="hidden md:block font-bold tracking-widest text-lg text-white font-mono">Q-BIT</span>
             </div>
             
             <div class="h-6 w-px bg-gray-700 hidden sm:block shrink-0"></div>
             
-            <!-- TITULO Y TAG (Restaurados) -->
+            <!-- TITULO -->
             <div class="flex flex-col justify-center min-w-0 shrink">
-                <span id="format-tag" class="text-[10px] font-mono bg-gray-800 px-1.5 py-0.5 rounded text-qbit-yellow uppercase tracking-wide w-fit">READER</span>
-                <h1 id="title-display" class="text-sm font-semibold text-gray-300 truncate max-w-[150px] sm:max-w-xs">Cargando...</h1>
+                <span id="format-tag" class="text-[9px] font-mono bg-gray-800 px-1.5 py-0.5 rounded text-qbit-cyan uppercase tracking-widest w-fit border border-gray-700">READER</span>
+                <h1 id="title-display" class="text-sm font-semibold text-gray-200 truncate max-w-[150px] sm:max-w-xs md:max-w-md">Cargando documento...</h1>
             </div>
 
-            <!-- CONTADOR DE PAGINAS (Nuevo) -->
-            <div class="flex items-center bg-gray-900 border border-gray-700 rounded px-2 py-1 gap-1 ml-2 shrink-0">
-                <span class="text-[10px] font-mono text-gray-500 uppercase hidden sm:inline">PÁG</span>
-                <input type="number" id="page-input" value="1" min="1" class="page-input w-8 sm:w-10 bg-transparent text-center text-sm font-bold text-white focus:outline-none focus:text-qbit-yellow placeholder-gray-600">
+            <!-- CONTADOR DE PAGINAS -->
+            <div class="flex items-center bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 gap-1 ml-2 shrink-0 shadow-inner">
+                <span class="text-[10px] font-mono text-gray-500 uppercase hidden sm:inline mr-1">PÁG</span>
+                <input type="number" id="page-input" value="1" min="1" class="page-input w-8 sm:w-12 bg-transparent text-center text-sm font-bold text-white focus:outline-none focus:text-qbit-cyan placeholder-gray-600">
                 <span class="text-gray-500 text-sm">/</span>
-                <span id="total-pages" class="text-gray-400 text-sm font-mono">--</span>
+                <span id="total-pages" class="text-gray-400 text-sm font-mono font-bold">--</span>
             </div>
         </div>
 
-        <!-- HERRAMIENTAS -->
-        <div class="flex items-center gap-2 sm:gap-3 shrink-0 ml-2">
-            <button onclick="toggleRuler()" id="btn-ruler" title="Activar Marcador" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-800 text-gray-400 hover:text-qbit-yellow transition">
+        <!-- HERRAMIENTAS DERECHAS -->
+        <div class="flex items-center gap-1 sm:gap-2 shrink-0 ml-2">
+            <!-- Notas (Nuevo) -->
+            <button onclick="toggleNotes()" id="btn-notes" title="Bloc de Notas" class="tool-btn">
+                <i data-lucide="edit-3" class="w-5 h-5"></i>
+            </button>
+
+            <div class="h-4 w-px bg-gray-700 mx-1 hidden sm:block"></div>
+
+            <button onclick="toggleRuler()" id="btn-ruler" title="Regla de Lectura" class="tool-btn">
                 <i data-lucide="ruler" class="w-5 h-5"></i>
             </button>
 
+            <!-- Zoom -->
             <div class="hidden sm:flex items-center bg-gray-900 border border-gray-700 rounded-lg p-0.5">
-                <button onclick="zoom(-0.1)" class="w-8 h-8 flex items-center justify-center hover:bg-gray-800 text-gray-300 rounded transition"><i data-lucide="minus" class="w-4 h-4"></i></button>
+                <button onclick="zoom(-0.1)" title="Alejar" class="w-8 h-8 flex items-center justify-center hover:bg-gray-800 text-gray-400 hover:text-white rounded transition"><i data-lucide="zoom-out" class="w-4 h-4"></i></button>
                 <div class="w-px h-4 bg-gray-700 mx-0.5"></div>
-                <button onclick="zoom(0.1)" class="w-8 h-8 flex items-center justify-center hover:bg-gray-800 text-gray-300 rounded transition"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                <button onclick="zoom(0.1)" title="Acercar" class="w-8 h-8 flex items-center justify-center hover:bg-gray-800 text-gray-400 hover:text-white rounded transition"><i data-lucide="zoom-in" class="w-4 h-4"></i></button>
             </div>
             
-            <button id="themeToggle" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-800 text-gray-300 transition">
+            <div class="h-4 w-px bg-gray-700 mx-1"></div>
+
+            <!-- Tema -->
+            <button id="themeToggle" title="Cambiar Tema" class="tool-btn">
                 <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
                 <i data-lucide="sun" class="w-5 h-5 hidden dark:block text-qbit-yellow"></i>
             </button>
 
-            <button onclick="closeReader()" class="w-9 h-9 flex items-center justify-center rounded-lg bg-red-900/30 text-red-500 hover:bg-red-900/50 hover:text-red-400 transition ml-2">
-                <i data-lucide="x" class="w-5 h-5"></i>
+            <!-- Cerrar -->
+            <button onclick="closeReader()" title="Cerrar Lector" class="w-9 h-9 flex items-center justify-center rounded-lg bg-red-950/30 text-red-500 border border-red-900/50 hover:bg-red-600 hover:text-white transition ml-1 sm:ml-2">
+                <i data-lucide="x" class="w-5 h-5 font-bold"></i>
             </button>
         </div>
     </header>
 
-    <main id="stage" class="flex-1 relative flex justify-center items-start overflow-hidden bg-qbit-light dark:bg-[#121212] w-full">
+    <!-- AREA PRINCIPAL (Lector + Panel de Notas) -->
+    <div class="flex-1 relative flex overflow-hidden">
         
-        <button onclick="changePage(-1)" class="absolute left-4 top-1/2 -translate-y-1/2 z-40 w-12 h-12 rounded-full hidden sm:flex items-center justify-center text-gray-400 hover:text-black hover:bg-white hover:shadow-xl dark:hover:text-qbit-yellow dark:hover:bg-gray-900 transition-all duration-300 opacity-50 hover:opacity-100 group">
-            <i data-lucide="chevron-left" class="w-8 h-8 group-hover:scale-110 transition"></i>
-        </button>
-        <button onclick="changePage(1)" class="absolute right-4 top-1/2 -translate-y-1/2 z-40 w-12 h-12 rounded-full hidden sm:flex items-center justify-center text-gray-400 hover:text-black hover:bg-white hover:shadow-xl dark:hover:text-qbit-yellow dark:hover:bg-gray-900 transition-all duration-300 opacity-50 hover:opacity-100 group">
-            <i data-lucide="chevron-right" class="w-8 h-8 group-hover:scale-110 transition"></i>
-        </button>
+        <!-- STAGE DE LECTURA -->
+        <main id="stage" class="flex-1 relative flex justify-center items-start overflow-hidden w-full">
+            
+            <!-- Botones de Navegación Flotantes -->
+            <button onclick="changePage(-1)" class="absolute left-4 top-1/2 -translate-y-1/2 z-40 w-12 h-12 rounded-full hidden sm:flex items-center justify-center text-gray-400 hover:text-qbit-cyan bg-white/10 dark:bg-black/50 border border-gray-300 dark:border-gray-700 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] backdrop-blur-md transition-all duration-300 opacity-30 hover:opacity-100 group">
+                <i data-lucide="chevron-left" class="w-8 h-8 group-hover:-translate-x-1 transition-transform"></i>
+            </button>
+            <button onclick="changePage(1)" class="absolute right-4 top-1/2 -translate-y-1/2 z-40 w-12 h-12 rounded-full hidden sm:flex items-center justify-center text-gray-400 hover:text-qbit-cyan bg-white/10 dark:bg-black/50 border border-gray-300 dark:border-gray-700 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] backdrop-blur-md transition-all duration-300 opacity-30 hover:opacity-100 group">
+                <i data-lucide="chevron-right" class="w-8 h-8 group-hover:translate-x-1 transition-transform"></i>
+            </button>
 
-        <div id="pdf-render" class="hidden"><canvas id="the-canvas"></canvas></div>
-        <div id="epub-render" class="hidden h-full w-full bg-white dark:bg-[#121212]"></div>
-        <iframe id="fallback-frame" class="w-full h-full hidden border-none bg-white"></iframe>
-        
-        <div id="empty-state" class="hidden absolute inset-0 flex flex-col items-center justify-center opacity-50">
-            <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-xl flex items-center justify-center mb-4">
-                <span class="text-2xl font-bold text-gray-400">Q</span>
+            <!-- Contenedores de Formatos -->
+            <div id="pdf-render" class="hidden"><canvas id="the-canvas"></canvas></div>
+            <div id="epub-render" class="hidden h-full w-full bg-transparent text-gray-800 dark:text-gray-200"></div>
+            <iframe id="fallback-frame" class="w-full h-full hidden border-none bg-white"></iframe>
+            
+            <div id="empty-state" class="hidden absolute inset-0 flex flex-col items-center justify-center opacity-50">
+                <div class="w-16 h-16 border-2 border-dashed border-gray-500 rounded-xl flex items-center justify-center mb-4">
+                    <span class="text-2xl font-bold font-mono">?</span>
+                </div>
+                <p class="text-sm font-mono tracking-widest uppercase">No Document Loaded</p>
             </div>
-            <p class="text-sm font-mono text-gray-500">SISTEMA EN ESPERA</p>
-        </div>
+        </main>
 
-    </main>
+        <!-- PANEL LATERAL DE NOTAS -->
+        <aside id="notes-sidebar">
+            <div class="p-4 border-b border-slate-700 bg-[#020617] flex justify-between items-center shrink-0">
+                <h2 class="text-qbit-yellow font-bold uppercase tracking-widest font-mono text-sm flex items-center gap-2">
+                    <i data-lucide="bookmark" class="w-4 h-4"></i> Study Notes
+                </h2>
+                <button onclick="toggleNotes()" class="text-gray-400 hover:text-white transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <!-- Advertencia -->
+            <div class="bg-red-950/40 border-b border-red-900/50 p-3 shrink-0">
+                <p class="text-[10px] text-red-400 leading-tight uppercase font-mono tracking-wide text-center">
+                    <span class="font-bold block mb-0.5">⚠️ TEMPORARY SESSION</span>
+                    Notes will be lost if you leave this page. Save as PDF before exiting.
+                </p>
+            </div>
 
-    <footer class="sm:hidden shrink-0 h-14 bg-black border-t border-gray-800 flex items-center justify-between px-6 z-50">
+            <!-- Input Area -->
+            <div class="p-4 shrink-0 bg-slate-900/50">
+                <textarea id="note-input" rows="3" class="w-full bg-black border border-slate-600 rounded-lg p-3 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-qbit-cyan resize-none font-sans transition-colors" placeholder="Write a note or summary here..."></textarea>
+                <button onclick="addNote()" class="w-full mt-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold py-2 rounded-lg text-xs uppercase tracking-widest transition-colors flex justify-center items-center gap-2">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Add Note
+                </button>
+            </div>
+
+            <!-- Notes List -->
+            <div class="flex-1 overflow-y-auto notes-list-scroll p-4 flex flex-col gap-3" id="notes-list">
+                <!-- Notas inyectadas por JS -->
+                <div id="no-notes-msg" class="text-center text-slate-500 text-xs italic mt-10">
+                    No notes recorded yet.
+                </div>
+            </div>
+
+            <!-- Export Footer -->
+            <div class="p-4 border-t border-slate-700 bg-[#020617] shrink-0">
+                <button onclick="exportNotesPDF()" class="w-full bg-qbit-yellow hover:bg-yellow-400 text-black font-bold py-3 rounded-lg text-sm uppercase tracking-widest shadow-[0_0_15px_rgba(250,204,21,0.2)] transition-all flex justify-center items-center gap-2">
+                    <i data-lucide="printer" class="w-4 h-4"></i> Print / Save Notes
+                </button>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- NAVEGACIÓN MÓVIL (Footer) -->
+    <footer class="sm:hidden shrink-0 h-14 bg-[#020617] border-t border-gray-800 flex items-center justify-between px-6 z-50">
         <button onclick="changePage(-1)" class="flex items-center gap-2 text-gray-400 hover:text-white active:scale-95 transition">
             <i data-lucide="chevron-left" class="w-6 h-6"></i>
-            <span class="text-xs font-bold">ANT</span>
+            <span class="text-xs font-bold uppercase tracking-widest">Prev</span>
         </button>
         
         <div class="h-4 w-px bg-gray-800"></div>
         
-        <button onclick="changePage(1)" class="flex items-center gap-2 text-qbit-yellow hover:text-yellow-300 active:scale-95 transition">
-            <span class="text-xs font-bold">SIG</span>
+        <button onclick="changePage(1)" class="flex items-center gap-2 text-qbit-cyan hover:text-cyan-300 active:scale-95 transition">
+            <span class="text-xs font-bold uppercase tracking-widest">Next</span>
             <i data-lucide="chevron-right" class="w-6 h-6"></i>
         </button>
     </footer>
 
     <script>
+        // Inicializar Iconos Lucide
         lucide.createIcons();
 
-        // --- GESTIÓN DE TEMA Y MARCADOR ---
+        // --- ESTADO GLOBAL ---
+        let currentScale = 1.0;
+        let pdfDoc = null;
+        let pageNum = 1;
+        let epubRendition = null;
+        let mode = 'none';
+        let currentEpubSize = 100;
+        let documentTitleForPrint = "Documento Sin Título";
+
+        // Elementos DOM
         const themeToggleBtn = document.getElementById('themeToggle');
         const htmlElement = document.documentElement;
         
-        // Elementos Nuevos
         const pageInput = document.getElementById('page-input');
         const totalPagesEl = document.getElementById('total-pages');
         let bookId = 'doc_generico'; // Variable para memoria
 
+        // --- REGLA DE LECTURA ---
         let rulerActive = false;
         const rulerEl = document.getElementById('reading-ruler');
         const stageEl = document.getElementById('stage');
@@ -221,20 +325,165 @@
             const btn = document.getElementById('btn-ruler');
             if(rulerActive) {
                 rulerEl.classList.remove('hidden');
-                btn.classList.add('text-qbit-yellow', 'bg-gray-800');
+                btn.classList.add('active');
                 stageEl.style.cursor = 'crosshair';
             } else {
                 rulerEl.classList.add('hidden');
-                btn.classList.remove('text-qbit-yellow', 'bg-gray-800');
+                btn.classList.remove('active');
                 stageEl.style.cursor = 'default';
             }
         }
 
-        stageEl.addEventListener('click', (e) => {
+        stageEl.addEventListener('mousemove', (e) => {
             if(rulerActive) {
-                rulerEl.style.top = (e.clientY) + 'px'; 
+                rulerEl.style.top = (e.clientY - 16) + 'px'; // Centrar
             }
         });
+        stageEl.addEventListener('touchmove', (e) => {
+            if(rulerActive && e.touches.length > 0) {
+                rulerEl.style.top = (e.touches[0].clientY - 16) + 'px';
+            }
+        });
+
+
+        // --- SISTEMA DE NOTAS ACADÉMICAS ---
+        let notesArray = [];
+        let isNotesOpen = false;
+
+        function toggleNotes() {
+            isNotesOpen = !isNotesOpen;
+            const sidebar = document.getElementById('notes-sidebar');
+            const btn = document.getElementById('btn-notes');
+            
+            if(isNotesOpen) {
+                sidebar.classList.add('active');
+                btn.classList.add('active');
+                // En móviles y desktop, enfocar el textarea si se abre
+                setTimeout(() => document.getElementById('note-input').focus(), 300);
+            } else {
+                sidebar.classList.remove('active');
+                btn.classList.remove('active');
+            }
+        }
+
+        function addNote() {
+            const input = document.getElementById('note-input');
+            const text = input.value.trim();
+            if(!text) return;
+
+            // Conseguir referencia de página según el formato
+            let ref = "General";
+            if(mode === 'pdf') ref = `Pág. ${pageNum}`;
+            else if(mode === 'epub') ref = `Ubicación ${pageInput.value}%`;
+
+            const note = {
+                id: Date.now(),
+                text: text,
+                reference: ref,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+
+            notesArray.push(note);
+            input.value = '';
+            renderNotes();
+        }
+
+        function deleteNote(id) {
+            notesArray = notesArray.filter(n => n.id !== id);
+            renderNotes();
+        }
+
+        function renderNotes() {
+            const list = document.getElementById('notes-list');
+            const msg = document.getElementById('no-notes-msg');
+            
+            // Limpiar lista (excepto el mensaje vacío)
+            Array.from(list.children).forEach(child => {
+                if(child.id !== 'no-notes-msg') child.remove();
+            });
+
+            if(notesArray.length === 0) {
+                msg.style.display = 'block';
+                return;
+            }
+            
+            msg.style.display = 'none';
+
+            // Renderizar inverso (más recientes arriba)
+            [...notesArray].reverse().forEach(note => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-800 border border-slate-600 p-3 rounded-lg relative group";
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-[10px] font-mono text-qbit-cyan bg-cyan-900/30 px-1.5 py-0.5 rounded border border-cyan-800">${note.reference}</span>
+                        <span class="text-[10px] text-slate-500">${note.time}</span>
+                    </div>
+                    <p class="text-sm text-gray-200 font-sans leading-relaxed whitespace-pre-wrap">${note.text}</p>
+                    <button onclick="deleteNote(${note.id})" class="absolute top-2 right-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                    </button>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function exportNotesPDF() {
+            if(notesArray.length === 0) {
+                alert("The notebook is empty. Please write a note before exporting.");
+                return;
+            }
+
+            // Construir HTML para la ventana de impresión
+            let printContents = `
+                <html>
+                <head>
+                    <title>Academic Notes - ${documentTitleForPrint}</title>
+                    <style>
+                        body { font-family: 'Arial', sans-serif; color: #000; padding: 40px; line-height: 1.6; }
+                        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; }
+                        .title { font-size: 24px; font-weight: bold; margin: 0 0 10px 0; text-transform: uppercase;}
+                        .subtitle { font-size: 14px; color: #555; }
+                        .note-block { margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; page-break-inside: avoid;}
+                        .note-meta { font-size: 12px; color: #666; font-family: monospace; font-weight: bold; margin-bottom: 8px; border-bottom: 1px dashed #ccc; padding-bottom: 5px;}
+                        .note-text { font-size: 14px; white-space: pre-wrap;}
+                        .footer { margin-top: 50px; font-size: 10px; color: #999; text-align: center; border-top: 1px solid #eee; padding-top: 10px;}
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="title">ACADEMIC NOTES REPORT</div>
+                        <div class="subtitle">Document: ${documentTitleForPrint}</div>
+                        <div class="subtitle">Export Date: ${new Date().toLocaleDateString()}</div>
+                    </div>
+            `;
+
+            // Mantener orden cronológico en el PDF
+            notesArray.forEach(note => {
+                printContents += `
+                    <div class="note-block">
+                        <div class="note-meta">Ref: ${note.reference} | Time: ${note.time}</div>
+                        <div class="note-text">${note.text}</div>
+                    </div>
+                `;
+            });
+
+            printContents += `
+                    <div class="footer">Generated by ADELID / Q-BIT Reader System</div>
+                </body>
+                </html>
+            `;
+
+            // Abrir ventana oculta y llamar a imprimir
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(printContents);
+            printWindow.document.close();
+            
+            // Pequeño delay para asegurar carga de estilos antes de imprimir
+            setTimeout(() => {
+                printWindow.print();
+            }, 250);
+        }
+
 
         // --- FUNCIONES DE MEMORIA Y PÁGINA ---
         pageInput.addEventListener('keypress', function (e) {
@@ -264,6 +513,7 @@
             }
         }
 
+        // --- GESTIÓN DE TEMA Y ESTILO EPUB ---
         function applyThemeToEpub() {
             if (!epubRendition) return;
             const isDark = htmlElement.classList.contains('dark');
@@ -274,6 +524,7 @@
             }
         }
 
+        // Recuperar tema del navegador/local storage
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             htmlElement.classList.add('dark');
         }
@@ -285,23 +536,20 @@
             applyThemeToEpub(); 
         });
 
-        // --- LÓGICA PRINCIPAL ---
-        let currentScale = 1.0;
-        let pdfDoc = null;
-        let pageNum = 1;
-        let epubRendition = null;
-        let mode = 'none';
-        let currentEpubSize = 100;
-
+        // --- LÓGICA PRINCIPAL (PDF / EPUB) ---
         window.onload = function() {
-            setTimeout(hideLoader, 4000);
+            // Prevenir carga infinita visual
+            setTimeout(hideLoader, 5000);
 
             const params = new URLSearchParams(window.location.search);
             const rawUrl = params.get('file') || params.get('libro');
             const title = params.get('title') || params.get('titulo');
 
             const titleEl = document.getElementById('title-display');
-            if (title && titleEl) titleEl.innerText = title;
+            if (title && titleEl) {
+                titleEl.innerText = title;
+                documentTitleForPrint = title; // Guardar para el PDF de notas
+            }
             
             // Generar ID único para memoria
             if(rawUrl) bookId = btoa(rawUrl.split('/').pop()).substring(0, 10);
@@ -320,17 +568,34 @@
 
         function initReader(rawUrl) {
             let url = rawUrl;
+            
+            // [NÚCLEO DE CONECTIVIDAD WIX -> GITHUB]
+            // Transforma las URLs internas de la base de datos CMS de Wix a links públicos.
             if (url.includes("wix:document://")) {
                 const parts = url.split("/");
-                if(parts.length >= 5) url = `https://docs.wixstatic.com/ugd/${parts[4]}`;
+                // La estructura del CMS de Wix es: wix:document://v1/ugd/ID_ALFANUMERICO.epub/Nombre_Archivo
+                // parts[4] captura exactamente el ID del archivo con su extensión real.
+                if(parts.length >= 5) {
+                    url = `https://docs.wixstatic.com/ugd/${parts[4]}`;
+                }
             }
             
-            console.log("Abriendo:", url);
-            let ext = 'pdf';
-            try { ext = url.split('?')[0].split('.').pop().toLowerCase(); } catch(e){}
+            console.log("Conexión de base de datos exitosa. Abriendo documento remoto:", url);
+            
+            let ext = 'pdf'; // Motor por defecto si falla la detección
+            try { 
+                // Extrae la extensión final del archivo ignorando parámetros extra como ?v=1
+                ext = url.split('?')[0].split('.').pop().toLowerCase(); 
+            } catch(e) {
+                console.warn("Extensión no detectada en URL. Usando motor PDF por defecto.");
+            }
 
-            if(ext === 'epub') loadEpub(url);
-            else loadPdfPro(url);
+            // Enrutador de motores de lectura
+            if(ext === 'epub') {
+                loadEpub(url);
+            } else {
+                loadPdfPro(url);
+            }
         }
 
         // MOTOR PDF
@@ -351,16 +616,13 @@
 
                 // RECUPERAR MEMORIA LOCAL
                 const savedPage = localStorage.getItem('progress_' + bookId);
-                if(savedPage) {
+                if(savedPage && parseInt(savedPage) <= pdfDoc.numPages) {
                     pageNum = parseInt(savedPage);
                 }
 
-                // AJUSTE ZOOM MÓVIL
-                if (window.innerWidth < 640) {
-                    currentScale = 0.6; 
-                } else {
-                    currentScale = 1.0;
-                }
+                // AJUSTE ZOOM INICIAL
+                if (window.innerWidth < 640) currentScale = 0.8; 
+                else currentScale = 1.3;
                 
                 renderPdfPage(pageNum);
             } catch (error) {
@@ -369,7 +631,16 @@
             }
         }
 
+        let isRendering = false;
+        let pageRenderingQueue = null;
+
         function renderPdfPage(num) {
+            if(isRendering) {
+                pageRenderingQueue = num;
+                return;
+            }
+            isRendering = true;
+
             pdfDoc.getPage(num).then(page => {
                 const canvas = document.getElementById('the-canvas');
                 const ctx = canvas.getContext('2d');
@@ -388,10 +659,15 @@
                     canvasContext: ctx,
                     transform: transform,
                     viewport: viewport
+                }).promise.then(() => {
+                    isRendering = false;
+                    updatePageDisplay();
+                    if (pageRenderingQueue !== null) {
+                        const np = pageRenderingQueue;
+                        pageRenderingQueue = null;
+                        renderPdfPage(np);
+                    }
                 });
-
-                // Actualizar número en el input
-                updatePageDisplay();
             });
         }
 
@@ -404,7 +680,7 @@
                 const book = ePub(url);
                 epubRendition = book.renderTo("epub-render", { width: "100%", height: "100%", flow: "paginated" });
                 
-                // Generar total páginas (porcentaje)
+                // Generar total páginas (estimación porcentual)
                 book.ready.then(() => {
                     return book.locations.generate(1000); 
                 }).then(() => {
@@ -423,16 +699,12 @@
                         p: { "font-size": "18px", "line-height": "1.6" }
                     });
                     
-                    // CORRECCIÓN MODO OSCURO: Forzamos el color en múltiples etiquetas
                     epubRendition.themes.register("dark", { 
                         body: { "font-family": "Inter, sans-serif", "color": "#e5e5e5 !important", "background-color": "#121212 !important", "padding": "0 20px" },
                         p: { "font-size": "18px", "line-height": "1.6", "color": "#e5e5e5 !important" },
                         span: { "color": "#e5e5e5 !important" },
                         div: { "color": "#e5e5e5 !important" },
-                        h1: { "color": "#e5e5e5 !important" },
-                        h2: { "color": "#e5e5e5 !important" },
-                        h3: { "color": "#e5e5e5 !important" },
-                        h4: { "color": "#e5e5e5 !important" },
+                        h1: { "color": "#e5e5e5 !important" }, h2: { "color": "#e5e5e5 !important" }, h3: { "color": "#e5e5e5 !important" },
                         a: { "color": "#60a5fa !important", "text-decoration": "underline" }
                     });
                     
@@ -444,7 +716,6 @@
                     if(location.start.percentage) {
                         let percent = Math.round(location.start.percentage * 100);
                         if(pageInput) pageInput.value = percent;
-                        // Guardar en memoria
                         localStorage.setItem('progress_' + bookId, location.start.cfi);
                     }
                 });
@@ -454,7 +725,7 @@
             }
         }
 
-        // FALLBACK
+        // FALLBACK (Lector de Google Docs de emergencia)
         function loadFallback(url) {
             setMode('google');
             hideLoader();
@@ -463,7 +734,7 @@
             iframe.src = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
         }
 
-        // UTILIDADES
+        // UTILIDADES Y CONTROLES
         function setMode(newMode) {
             mode = newMode;
             document.getElementById('pdf-render').classList.add('hidden');
@@ -471,7 +742,6 @@
             document.getElementById('epub-render').classList.add('hidden');
             document.getElementById('fallback-frame').classList.add('hidden');
             
-            // PROTECCIÓN CONTRA ERRORES
             const tag = document.getElementById('format-tag');
             if(tag) tag.innerText = newMode.toUpperCase();
         }
@@ -491,22 +761,43 @@
         function zoom(delta) {
             if(mode === 'pdf') {
                 const newScale = currentScale + delta;
-                if(newScale > 0.2 && newScale < 4.0) {
+                // Limitar zoom PDF
+                if(newScale > 0.5 && newScale < 3.0) {
                     currentScale = newScale;
                     renderPdfPage(pageNum);
                 }
             } else if (mode === 'epub' && epubRendition) {
                 currentEpubSize += (delta * 100); 
-                if(currentEpubSize < 50) currentEpubSize = 50;
-                if(currentEpubSize > 300) currentEpubSize = 300;
+                // Limitar zoom EPUB
+                if(currentEpubSize < 60) currentEpubSize = 60;
+                if(currentEpubSize > 250) currentEpubSize = 250;
                 epubRendition.themes.fontSize(currentEpubSize + "%");
             }
         }
 
         function closeReader() {
+            if(notesArray.length > 0) {
+                if(!confirm("Warning: You have unsaved notes! Are you sure you want to exit?")) {
+                    // Si el usuario cancela, no cerrar y abrir el panel de notas por si acaso
+                    if(!isNotesOpen) toggleNotes();
+                    return;
+                }
+            }
+            // Intentar cerrar si se abrió por window.open
             try { window.close(); } catch(e){}
+            // Alternativa: volver atrás en el historial (Wix iFrame friendly)
             window.history.back();
         }
+
+        // Soporte Teclado (Flechas)
+        window.addEventListener('keydown', (e) => {
+            // Prevenir cambio de página si se está escribiendo una nota o buscando página
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
+            if (e.key === 'ArrowRight') changePage(1);
+            else if (e.key === 'ArrowLeft') changePage(-1);
+        });
+
     </script>
 </body>
 </html>
