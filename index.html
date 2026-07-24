@@ -36,7 +36,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- LIBRERÍAS DE LECTURA -->
+    <!-- LIBRERÍAS DE LECTURA (Sin modificaciones) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -101,8 +101,9 @@
         /* NOTAS LATERALES (Sidebar optimizada para móviles) */
         #notes-sidebar {
             position: fixed; top: 64px; right: -100%; /* Oculto fuera de la pantalla */
-            width: 100%; max-width: 380px; /* 100% en móvil, 380px en desktop */
-            height: calc(100dvh - 64px);
+            width: 100%; max-width: 380px; 
+            /* Altura adaptada: 100dvh - (64px header + 56px footer barra de móviles) = 120px */
+            height: calc(100dvh - 120px); 
             background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
             border-left: 1px solid rgba(250, 204, 21, 0.3);
             box-shadow: -10px 0 30px rgba(0,0,0,0.5); z-index: 45;
@@ -110,6 +111,13 @@
             display: flex; flex-direction: column;
         }
         #notes-sidebar.active { right: 0; }
+        
+        /* En computadoras (min-width: 768px), el footer no existe, por lo que regresamos la altura a solo restar el header */
+        @media (min-width: 768px) {
+            #notes-sidebar {
+                height: calc(100dvh - 64px); 
+            }
+        }
 
         .notes-list-scroll::-webkit-scrollbar { width: 6px; }
         .notes-list-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
@@ -195,6 +203,12 @@
             <button id="themeToggle" title="Cambiar Tema" class="tool-btn">
                 <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
                 <i data-lucide="sun" class="w-5 h-5 hidden dark:block text-qbit-yellow"></i>
+            </button>
+            
+            <!-- Botón Pantalla Completa -->
+            <button onclick="toggleFullScreen()" id="btn-fullscreen" title="Pantalla Completa" class="tool-btn">
+                <i data-lucide="maximize" id="icon-maximize" class="w-5 h-5 block"></i>
+                <i data-lucide="minimize" id="icon-minimize" class="w-5 h-5 hidden"></i>
             </button>
 
             <!-- Cerrar -->
@@ -458,7 +472,7 @@
             setTimeout(() => { printWindow.print(); }, 250);
         }
 
-        // --- STREAMING_CHUNK: Reader Controls ---
+        // --- STREAMING_CHUNK: Reader Controls & FullScreen ---
         let rulerActive = false;
         const rulerEl = document.getElementById('reading-ruler');
         const stageEl = document.getElementById('stage');
@@ -483,6 +497,47 @@
         stageEl.addEventListener('mousemove', (e) => updateRulerPos(e.clientY));
         stageEl.addEventListener('touchstart', (e) => { if(e.touches.length > 0) updateRulerPos(e.touches[0].clientY); }, {passive: true});
         stageEl.addEventListener('touchmove', (e) => { if(e.touches.length > 0) updateRulerPos(e.touches[0].clientY); }, {passive: true});
+
+        // Toggle para Pantalla Completa
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else if (document.documentElement.webkitRequestFullscreen) { /* Safari */
+                    document.documentElement.webkitRequestFullscreen();
+                } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
+                    document.documentElement.msRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) { /* Safari */
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) { /* IE11 */
+                    document.msExitFullscreen();
+                }
+            }
+        }
+
+        // Listener para cambiar los íconos de Pantalla Completa
+        function updateFullscreenIcon() {
+            const maximizeIcon = document.getElementById('icon-maximize');
+            const minimizeIcon = document.getElementById('icon-minimize');
+            if (document.fullscreenElement) {
+                maximizeIcon.classList.add('hidden');
+                maximizeIcon.classList.remove('block');
+                minimizeIcon.classList.remove('hidden');
+                minimizeIcon.classList.add('block');
+            } else {
+                maximizeIcon.classList.remove('hidden');
+                maximizeIcon.classList.add('block');
+                minimizeIcon.classList.add('hidden');
+                minimizeIcon.classList.remove('block');
+            }
+        }
+        
+        document.addEventListener('fullscreenchange', updateFullscreenIcon);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
 
         pageInput.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
